@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <GLFW/glfw3.h>
 #include "core/CoreTypes.hpp"
 
 namespace Rehnda::Windowing {
@@ -17,5 +18,11 @@ namespace Rehnda::Windowing {
 
     private:
         Owner<GLFWwindow*> window;
+        Pixels width;
+        Pixels height;
+    public:
+        const GLFWwindow *getWindow() const;
+        const Pixels &getWidth() const;
+        const Pixels &getHeight() const;
     };
 }

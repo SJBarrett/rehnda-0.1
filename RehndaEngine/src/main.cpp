@@ -1,25 +1,21 @@
-#include <vulkan/vulkan.hpp>
-#include <GLFW/glfw3.h>
-
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/vec4.hpp>
-#include <glm/mat4x4.hpp>
 
 #include <iostream>
 
-#include "core/CoreTypes.hpp"
-#include "windowing/Window.hpp"
+#include "game/Application.hpp"
 
 using namespace Rehnda;
 
 int main() {
-    std::cout << "Hello, W2orld!" << std::endl;
-    Windowing::Window window(Pixels(600), Pixels(800));
+    Application application;
 
-    while (!window.should_close()) {
-
+    try {
+        application.run();
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
