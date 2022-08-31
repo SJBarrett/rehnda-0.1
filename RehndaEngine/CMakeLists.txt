@@ -15,16 +15,28 @@ if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
 endif()
 include(${CMAKE_BINARY_DIR}/conan.cmake)
 
+# FIND VULKAN
+find_package(Vulkan REQUIRED)
+IF (NOT Vulkan_FOUND)
+    message(FATAL_ERROR "Vulkan not found!")
+ENDIF()
+message(STATUS "Vulkan lib path: " ${Vulkan_LIBRARY})
+message(STATUS "Vulkan include path: " ${Vulkan_INCLUDE_DIRS})
+
 conan_cmake_run(REQUIRES
         glm/0.9.9.7
+        glfw/3.3.7
         ms-gsl/4.0.0
         fmt/9.0.0
         spdlog/1.10.0
         magic_enum/0.8.0
+        namedtype/20190324
         BASIC_SETUP BUILD missing BUILD_TYPE Debug)
+add_definitions(-DGLFW_INCLUDE_NONE)
 
 set(SOURCE_FILES
         src/main.cpp
+        src/windowing/Window.cpp
         )
 
 add_executable(${ENGINE_TARGET_NAME} ${SOURCE_FILES})
@@ -32,8 +44,9 @@ set_property(TARGET ${ENGINE_TARGET_NAME} PROPERTY CXX_STANDARD 20)
 set_property(TARGET ${ENGINE_TARGET_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 target_link_libraries(${ENGINE_TARGET_NAME}
         ${CONAN_LIBS}
+        ${Vulkan_LIBRARY}
         )
-include_directories(include)
+include_directories(include ${Vulkan_INCLUDE_DIRS})
 
 add_custom_command(
         TARGET ${ENGINE_TARGET_NAME}
