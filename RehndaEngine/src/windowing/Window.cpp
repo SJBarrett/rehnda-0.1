@@ -1,11 +1,11 @@
 //
 // Created by sjbar on 31/08/2022.
 //
-#include <vulkan/vulkan.hpp>
 #include <GLFW/glfw3.h>
-#include <core/Logger.hpp>
 
 #include "Windowing/Window.hpp"
+#include "rendering/vulkan/VkInstanceHelpers.hpp"
+#include "rendering/vulkan/VkDebugHelpers.hpp"
 
 namespace Rehnda::Windowing {
     Window::Window(Pixels width, Pixels height) : width(width), height(height) {
@@ -13,17 +13,31 @@ namespace Rehnda::Windowing {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
         window = glfwCreateWindow(width.get(), height.get(), "Rehnda", nullptr, nullptr);
+#ifdef NDEBUG
+        enableValidationLayers = false;
+#else
+        enableValidationLayers = true;
+#endif
 
-        const std::vector<vk::ExtensionProperties> a = vk::enumerateInstanceExtensionProperties();
-        Log::info("Num extensions: {}", a.size());
+        if (enableValidationLayers) {
+            vkInstance = VkInstanceHelpers::build_vulkan_instance({"VK_LAYER_KHRONOS_validation"});
+            VkDebugHelpers::setup_debug_messenger(vkInstance, &debugMessenger, nullptr);
+        } else {
+            vkInstance = VkInstanceHelpers::build_vulkan_instance({});
+        }
     }
 
     Window::~Window() {
+        if (enableValidationLayers) {
+            VkDebugHelpers::destroy_debug_messenger(vkInstance, debugMessenger);
+        }
         glfwDestroyWindow(window);
         glfwTerminate();
+
+        vkInstance.destroy();
     }
 
-    bool Window::should_close() {
+    bool Window::should_close() const {
         return glfwWindowShouldClose(window);
     }
 
@@ -31,15 +45,15 @@ namespace Rehnda::Windowing {
         glfwPollEvents();
     }
 
-    const GLFWwindow *Window::getWindow() const {
+    const GLFWwindow *Window::get_window() const {
         return window;
     }
 
-    const Pixels &Window::getWidth() const {
+    const Pixels &Window::get_width() const {
         return width;
     }
 
-    const Pixels &Window::getHeight() const {
+    const Pixels &Window::get_height() const {
         return height;
     }
 }

@@ -37,7 +37,7 @@ add_definitions(-DGLFW_INCLUDE_NONE)
 set(SOURCE_FILES
         src/main.cpp
         src/windowing/Window.cpp
-        src/game/Application.cpp include/game/Application.hpp)
+        src/game/Application.cpp include/game/Application.hpp src/rendering/vulkan/VkInstanceHelpers.cpp include/rendering/vulkan/VkInstanceHelpers.hpp src/rendering/vulkan/VkDebugHelpers.cpp include/rendering/vulkan/VkDebugHelpers.hpp)
 
 add_executable(${ENGINE_TARGET_NAME} ${SOURCE_FILES})
 set_property(TARGET ${ENGINE_TARGET_NAME} PROPERTY CXX_STANDARD 20)
