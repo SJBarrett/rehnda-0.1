@@ -22,33 +22,16 @@ namespace Rehnda {
         }
 
         physicalDevice = pickPhysicalDevice();
+        device = createDevice(physicalDevice);
+        graphicsQueue = device.getQueue(findQueues(physicalDevice).graphicsQueueIndex.value().get(), 0);
     }
 
     VkManager::~VkManager() {
         if (enableValidationLayers) {
             VkDebugHelpers::destroy_debug_messenger(instance, debugMessenger);
         }
+        device.destroy();
         instance.destroy();
-    }
-
-    QueueFamilyIndices VkManager::findQueues(const vk::PhysicalDevice &device) const {
-        QueueFamilyIndices indices;
-
-        const auto queueFamilyProperties = device.getQueueFamilyProperties();
-
-        int i = 0;
-        for (const auto& queueFamily : queueFamilyProperties) {
-            if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics) {
-                indices.graphicsQueueIndex = GraphicsQueueIndex(i);
-            }
-
-            if (indices.requiredFamiliesFound()) {
-                break;
-            }
-            i++;
-        }
-
-        return indices;
     }
 
 
@@ -73,7 +56,48 @@ namespace Rehnda {
         }
     }
 
-    int VkManager::rateDeviceSuitability(const vk::PhysicalDevice &device) const {
+    vk::Device VkManager::createDevice(const vk::PhysicalDevice &physicalDevice) {
+        const auto queueFamilyIndices = findQueues(physicalDevice);
+        float queuePriority = 1.0f;
+        vk::DeviceQueueCreateInfo queueCreateInfo{
+                .queueFamilyIndex = queueFamilyIndices.graphicsQueueIndex.value().get(),
+                .queueCount = 1,
+                .pQueuePriorities = &queuePriority,
+        };
+
+        vk::PhysicalDeviceFeatures physicalDeviceFeatures;
+
+        vk::DeviceCreateInfo deviceCreateInfo{
+                .queueCreateInfoCount = 1,
+                .pQueueCreateInfos = &queueCreateInfo,
+                .enabledExtensionCount = 0,
+                .pEnabledFeatures = &physicalDeviceFeatures,
+        };
+
+        return physicalDevice.createDevice(deviceCreateInfo);
+    }
+
+    QueueFamilyIndices VkManager::findQueues(const vk::PhysicalDevice &device) {
+        QueueFamilyIndices indices;
+
+        const auto queueFamilyProperties = device.getQueueFamilyProperties();
+
+        int i = 0;
+        for (const auto &queueFamily: queueFamilyProperties) {
+            if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics) {
+                indices.graphicsQueueIndex = GraphicsQueueIndex(i);
+            }
+
+            if (indices.requiredFamiliesFound()) {
+                break;
+            }
+            i++;
+        }
+
+        return indices;
+    }
+
+    int VkManager::rateDeviceSuitability(const vk::PhysicalDevice &device) {
         const auto deviceProperties = device.getProperties();
         const auto deviceFeatures = device.getFeatures();
         int score = 1;
