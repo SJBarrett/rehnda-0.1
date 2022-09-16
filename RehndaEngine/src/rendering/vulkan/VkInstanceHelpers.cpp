@@ -11,7 +11,7 @@
 
 
 namespace Rehnda::VkInstanceHelpers {
-    vk::Instance build_vulkan_instance(std::vector<const char*> validationLayers) {
+    vk::Instance buildVulkanInstance(std::vector<const char*> validationLayers) {
         vk::ApplicationInfo applicationInfo {
                 .pApplicationName = "Rehnda",
                 .applicationVersion = VK_MAKE_VERSION(1, 0, 0),

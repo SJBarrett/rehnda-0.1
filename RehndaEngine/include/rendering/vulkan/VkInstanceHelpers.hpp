@@ -8,7 +8,7 @@
 #include <vulkan/vulkan.hpp>
 
 namespace Rehnda::VkInstanceHelpers {
-    vk::Instance build_vulkan_instance(std::vector<const char *> validationLayers);
+    vk::Instance buildVulkanInstance(std::vector<const char *> validationLayers);
 
     bool are_validation_layers_supported(const std::vector<const char *> &validationLayers);
 

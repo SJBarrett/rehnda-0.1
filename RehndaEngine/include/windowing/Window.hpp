@@ -7,6 +7,7 @@
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.hpp>
 #include "core/CoreTypes.hpp"
+#include "rendering/vulkan/VkManager.hpp"
 
 namespace Rehnda::Windowing {
     class Window {
@@ -14,27 +15,26 @@ namespace Rehnda::Windowing {
         explicit Window(Pixels width, Pixels height);
         ~Window();
 
-        bool should_close() const;
-        void poll_events();
-
-
+        bool shouldClose() const;
+        void pollEvents();
     private:
         Owner<GLFWwindow*> window;
         Pixels width;
         Pixels height;
 
-        vk::Instance vkInstance;
-
-        bool enableValidationLayers = false;
-        vk::DebugUtilsMessengerEXT debugMessenger;
+        VkManager vkManager;
     public:
         [[nodiscard]]
-        const GLFWwindow *get_window() const;
+        const VkManager &getVkManager() const;
+
+    public:
+        [[nodiscard]]
+        const GLFWwindow *getWindow() const;
 
         [[nodiscard]]
-        const Pixels &get_width() const;
+        const Pixels &getWidth() const;
 
         [[nodiscard]]
-        const Pixels &get_height() const;
+        const Pixels &getHeight() const;
     };
 }

@@ -9,7 +9,7 @@
 
 namespace Rehnda::VkDebugHelpers {
 
-    void setup_debug_messenger(const vk::Instance& instance, vk::DebugUtilsMessengerEXT* debugMessenger, const vk::AllocationCallbacks* allocator = nullptr);
+    void setupDebugMessenger(const vk::Instance& instance, vk::DebugUtilsMessengerEXT* debugMessenger, const vk::AllocationCallbacks* allocator = nullptr);
     void destroy_debug_messenger(const vk::Instance& instance, vk::DebugUtilsMessengerEXT debugMessenger, const vk::AllocationCallbacks* allocator = nullptr);
 
     vk::DebugUtilsMessengerCreateInfoEXT build_debug_messenger_create_info();

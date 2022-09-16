@@ -31,7 +31,7 @@ namespace Rehnda::VkDebugHelpers {
         instance.destroyDebugUtilsMessengerEXT(debugMessenger, allocator, dldi);
     }
 
-    void setup_debug_messenger(const vk::Instance& instance, vk::DebugUtilsMessengerEXT* debugMessenger, const vk::AllocationCallbacks* allocator) {
+    void setupDebugMessenger(const vk::Instance& instance, vk::DebugUtilsMessengerEXT* debugMessenger, const vk::AllocationCallbacks* allocator) {
         vk::DebugUtilsMessengerCreateInfoEXT createInfo = build_debug_messenger_create_info();
         auto dldi = vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr);
         if (instance.createDebugUtilsMessengerEXT(&createInfo, allocator, debugMessenger, dldi) != vk::Result::eSuccess) {
