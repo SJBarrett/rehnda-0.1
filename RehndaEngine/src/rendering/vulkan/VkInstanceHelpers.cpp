@@ -9,7 +9,6 @@
 #include "rendering/vulkan/VkDebugHelpers.hpp"
 
 
-
 namespace Rehnda::VkInstanceHelpers {
     vk::Instance buildVulkanInstance(std::vector<const char*> validationLayers) {
         vk::ApplicationInfo applicationInfo {

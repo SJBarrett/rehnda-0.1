@@ -22,10 +22,10 @@ namespace Rehnda::Windowing {
         Pixels width;
         Pixels height;
 
-        VkManager vkManager;
+        std::unique_ptr<VkManager> vkManager;
     public:
         [[nodiscard]]
-        const VkManager &getVkManager() const;
+        const VkManager* getVkManager() const;
 
     public:
         [[nodiscard]]

@@ -3,6 +3,8 @@
 //
 #include <GLFW/glfw3.h>
 
+#include <memory>
+
 #include "Windowing/Window.hpp"
 
 namespace Rehnda::Windowing {
@@ -11,6 +13,7 @@ namespace Rehnda::Windowing {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
         window = glfwCreateWindow(width.get(), height.get(), "Rehnda", nullptr, nullptr);
+        vkManager = std::make_unique<VkManager>(window);
     }
 
     Window::~Window() {
@@ -38,7 +41,7 @@ namespace Rehnda::Windowing {
         return height;
     }
 
-    const VkManager &Window::getVkManager() const {
-        return vkManager;
+    const VkManager* Window::getVkManager() const {
+        return vkManager.get();
     }
 }

@@ -6,21 +6,25 @@
 
 #define VULKAN_HPP_NO_CONSTRUCTORS
 #include <vulkan/vulkan.hpp>
+#include <GLFW/glfw3.h>
+
 #include "VkTypes.hpp"
 
 
 namespace Rehnda {
     struct QueueFamilyIndices {
         std::optional<GraphicsQueueIndex> graphicsQueueIndex;
+        std::optional<PresentQueueIndex> presentQueueIndex;
 
-        bool requiredFamiliesFound() {
-            return graphicsQueueIndex.has_value();
+        [[nodiscard]]
+        bool requiredFamiliesFound() const {
+            return graphicsQueueIndex.has_value() && presentQueueIndex.has_value();
         }
     };
 
     class VkManager {
     public:
-        explicit VkManager();
+        explicit VkManager(GLFWwindow* window);
         ~VkManager();
     private:
         vk::Instance instance;
@@ -28,6 +32,9 @@ namespace Rehnda {
         vk::Device device;
 
         vk::Queue graphicsQueue;
+        vk::Queue presentQueue;
+
+        vk::SurfaceKHR surfaceKhr;
 
         bool enableValidationLayers;
         vk::DebugUtilsMessengerEXT debugMessenger;
@@ -36,8 +43,8 @@ namespace Rehnda {
         [[nodiscard]]
         vk::PhysicalDevice pickPhysicalDevice() const;
 
-        static vk::Device createDevice(const vk::PhysicalDevice& physicalDevice);
-        static QueueFamilyIndices findQueues(const vk::PhysicalDevice& device);
-        static int rateDeviceSuitability(const vk::PhysicalDevice& device);
+        static vk::Device createDevice(const vk::PhysicalDevice& physicalDevice, const vk::SurfaceKHR& surfaceKhr);
+        static QueueFamilyIndices findQueueFamilies(const vk::PhysicalDevice& device, const vk::SurfaceKHR &surfaceKhr);
+        static int rateDeviceSuitability(const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr);
     };
 }
