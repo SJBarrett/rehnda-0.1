@@ -6,11 +6,12 @@
 
 
 #include <map>
+#include <memory>
 #include <set>
 
 #include "rendering/vulkan/VkDebugHelpers.hpp"
 #include "rendering/vulkan/VkInstanceHelpers.hpp"
-#include "rendering/vulkan/RSwapchain.hpp"
+#include "rendering/vulkan/SwapchainManager.hpp"
 
 const std::vector<const char *> requiredDeviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -43,12 +44,14 @@ namespace Rehnda {
         presentQueue = device.getQueue(queueFamilyIndices.presentQueueIndex.value().get(), 0);
 
         swapchain.initSwapchain(window, physicalDevice, &device, surface);
+        graphicsPipeline = std::make_unique<GraphicsPipeline>(&device, &swapchain);
     }
 
     VkManager::~VkManager() {
         if (enableValidationLayers) {
             VkDebugHelpers::destroy_debug_messenger(instance, debugMessenger);
         }
+        graphicsPipeline->destroy();
         swapchain.destroy();
         device.destroy();
         instance.destroySurfaceKHR(surface);
@@ -165,7 +168,7 @@ namespace Rehnda {
             return 0;
         }
 
-        const auto swapChainSupportDetails = RSwapchain::querySwapChainSupport(device, surfaceKhr);
+        const auto swapChainSupportDetails = SwapchainManager::querySwapChainSupport(device, surfaceKhr);
         if (swapChainSupportDetails.formats.empty() || swapChainSupportDetails.presentModes.empty()) {
             return 0;
         }

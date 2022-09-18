@@ -2,17 +2,20 @@
 // Created by sjbar on 18/09/2022.
 //
 
-#include "rendering/vulkan/RSwapchain.hpp"
+#include "rendering/vulkan/SwapchainManager.hpp"
 #include "rendering/vulkan/VkManager.hpp"
 #include <limits>
 #include <spdlog/spdlog.h>
 
 namespace Rehnda {
-    void RSwapchain::initSwapchain(GLFWwindow *window, const vk::PhysicalDevice &physicalDevice, const vk::Device* device, const vk::SurfaceKHR& surface) {
+    void SwapchainManager::initSwapchain(GLFWwindow *window, const vk::PhysicalDevice &physicalDevice, const vk::Device* device, const vk::SurfaceKHR& surface) {
         SwapChainSupportDetails swapChainSupportDetails = querySwapChainSupport(physicalDevice, surface);
         const auto surfaceFormat = chooseSwapSurfaceFormat(swapChainSupportDetails.formats);
         const auto presentMode = chooseSwapPresentMode(swapChainSupportDetails.presentModes);
         const auto extent = chooseSwapExtent(window, swapChainSupportDetails.capabilities);
+
+        swapchainImageFormat = surfaceFormat.format;
+        swapchainExtent = extent;
 
         // want one more than the minimum so we don't have to wait for the driver to complete operations
         uint32_t imageCount = swapChainSupportDetails.capabilities.minImageCount + 1;
@@ -57,11 +60,37 @@ namespace Rehnda {
         swapchainImages = device->getSwapchainImagesKHR(swapchain);
 
         owningDevice = device;
+        createImageViews();
         initialized = true;
     }
 
+    void SwapchainManager::createImageViews() {
+        swapchainImageViews.resize(swapchainImages.size());
 
-    SwapChainSupportDetails RSwapchain::querySwapChainSupport(const vk::PhysicalDevice &physicalDevice, const vk::SurfaceKHR &surface) {
+        for (size_t i = 0; i < swapchainImages.size(); i++) {
+            vk::ImageViewCreateInfo imageViewCreateInfo {
+                .image = swapchainImages[i],
+                .viewType = vk::ImageViewType::e2D,
+                .format = swapchainImageFormat,
+                .components = {
+                        .r = vk::ComponentSwizzle::eIdentity,
+                        .g = vk::ComponentSwizzle::eIdentity,
+                        .b = vk::ComponentSwizzle::eIdentity,
+                        .a = vk::ComponentSwizzle::eIdentity,
+                },
+                .subresourceRange = {
+                        .aspectMask = vk::ImageAspectFlagBits::eColor,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1,
+                },
+            };
+            swapchainImageViews[i] = owningDevice->createImageView(imageViewCreateInfo);
+        }
+    }
+
+    SwapChainSupportDetails SwapchainManager::querySwapChainSupport(const vk::PhysicalDevice &physicalDevice, const vk::SurfaceKHR &surface) {
         return {
                 .capabilities = physicalDevice.getSurfaceCapabilitiesKHR(surface),
                 .formats = physicalDevice.getSurfaceFormatsKHR(surface),
@@ -69,7 +98,7 @@ namespace Rehnda {
         };
     }
 
-    vk::SurfaceFormatKHR RSwapchain::chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats) {
+    vk::SurfaceFormatKHR SwapchainManager::chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats) {
         for (const auto& availableFormat : availableFormats) {
             if (availableFormat.format == vk::Format::eB8G8R8A8Srgb && availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
                 return availableFormat;
@@ -78,7 +107,7 @@ namespace Rehnda {
         return availableFormats[0];
     }
 
-    vk::PresentModeKHR RSwapchain::chooseSwapPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes) {
+    vk::PresentModeKHR SwapchainManager::chooseSwapPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes) {
         for (const auto& availablePresentMode : availablePresentModes) {
             if (availablePresentMode == vk::PresentModeKHR::eMailbox) {
                 return availablePresentMode;
@@ -87,7 +116,7 @@ namespace Rehnda {
         return vk::PresentModeKHR::eFifo;
     }
 
-    vk::Extent2D RSwapchain::chooseSwapExtent(GLFWwindow* window, const vk::SurfaceCapabilitiesKHR &capabilities) {
+    vk::Extent2D SwapchainManager::chooseSwapExtent(GLFWwindow* window, const vk::SurfaceCapabilitiesKHR &capabilities) {
         if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
             return capabilities.currentExtent;
         } else {
@@ -106,19 +135,25 @@ namespace Rehnda {
         }
     }
 
-    RSwapchain::~RSwapchain() {
-#ifdef DEBUG
-        if (initialized) {
-            SPDLOG_ERROR("RSwapchain should have been destroyed before being deconstructed!");
-        }
-#endif
+    SwapchainManager::~SwapchainManager() {
+        assert(!initialized);
     }
 
-    void RSwapchain::destroy() {
+    void SwapchainManager::destroy() {
         if (owningDevice == nullptr) {
             SPDLOG_WARN("Tried to destroy a swapchain that hasn't been initialized!");
         } else {
+            initialized = false;
             owningDevice->destroySwapchainKHR(swapchain);
+            for (auto & swapchainImageView : swapchainImageViews) {
+                owningDevice->destroyImageView(swapchainImageView);
+            }
         }
     }
+
+    vk::Extent2D SwapchainManager::getExtent() const {
+        return swapchainExtent;
+    }
+
+
 }

@@ -10,7 +10,8 @@
 #include <GLFW/glfw3.h>
 
 #include "VkTypes.hpp"
-#include "RSwapchain.hpp"
+#include "SwapchainManager.hpp"
+#include "GraphicsPipeline.hpp"
 
 
 namespace Rehnda {
@@ -41,7 +42,8 @@ namespace Rehnda {
         vk::Queue graphicsQueue;
         vk::Queue presentQueue;
 
-        RSwapchain swapchain;
+        SwapchainManager swapchain;
+        std::unique_ptr<GraphicsPipeline> graphicsPipeline;
 
         vk::SurfaceKHR surface;
 

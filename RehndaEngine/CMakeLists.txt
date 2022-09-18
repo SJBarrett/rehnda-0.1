@@ -37,7 +37,13 @@ add_definitions(-DGLFW_INCLUDE_NONE)
 set(SOURCE_FILES
         src/main.cpp
         src/windowing/Window.cpp
-        src/game/Application.cpp include/game/Application.hpp src/rendering/vulkan/VkInstanceHelpers.cpp include/rendering/vulkan/VkInstanceHelpers.hpp src/rendering/vulkan/VkDebugHelpers.cpp include/rendering/vulkan/VkDebugHelpers.hpp src/rendering/vulkan/VkManager.cpp include/rendering/vulkan/VkManager.hpp src/rendering/vulkan/RSwapchain.cpp include/rendering/vulkan/RSwapchain.hpp)
+        src/game/Application.cpp
+        src/rendering/vulkan/VkInstanceHelpers.cpp
+        src/rendering/vulkan/VkDebugHelpers.cpp
+        src/rendering/vulkan/VkManager.cpp
+        src/rendering/vulkan/SwapchainManager.cpp
+        src/rendering/vulkan/GraphicsPipeline.cpp
+        src/core/FileUtils.cpp)
 
 add_executable(${ENGINE_TARGET_NAME} ${SOURCE_FILES})
 set_property(TARGET ${ENGINE_TARGET_NAME} PROPERTY CXX_STANDARD 20)
@@ -56,3 +62,41 @@ add_custom_command(
         TARGET ${ENGINE_TARGET_NAME}
         PRE_BUILD COMMAND ${CMAKE_COMMAND} -E
         create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/resources $<TARGET_FILE_DIR:${ENGINE_TARGET_NAME}>/resources)
+
+# Compile shaders from -> https://gist.github.com/evilactually/a0d191701cb48f157b05be7f74d79396
+
+if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "AMD64")
+    set(GLSL_VALIDATOR "$ENV{VULKAN_SDK}/Bin/glslangValidator.exe")
+else()
+    set(GLSL_VALIDATOR "$ENV{VULKAN_SDK}/Bin32/glslangValidator.exe")
+endif()
+
+file(GLOB_RECURSE GLSL_SOURCE_FILES
+        "shaders/*.frag"
+        "shaders/*.vert"
+        )
+
+foreach(GLSL ${GLSL_SOURCE_FILES})
+    get_filename_component(FILE_NAME ${GLSL} NAME)
+    set(SPIRV "${PROJECT_BINARY_DIR}/shaders/${FILE_NAME}.spv")
+    add_custom_command(
+            OUTPUT ${SPIRV}
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/shaders/"
+            COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}
+            DEPENDS ${GLSL})
+    list(APPEND SPIRV_BINARY_FILES ${SPIRV})
+endforeach(GLSL)
+
+add_custom_target(
+        Shaders
+        DEPENDS ${SPIRV_BINARY_FILES}
+)
+
+add_dependencies(${ENGINE_TARGET_NAME} Shaders)
+
+add_custom_command(TARGET ${ENGINE_TARGET_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${ENGINE_TARGET_NAME}>/shaders/"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${PROJECT_BINARY_DIR}/shaders"
+        "$<TARGET_FILE_DIR:${ENGINE_TARGET_NAME}>/shaders"
+        )

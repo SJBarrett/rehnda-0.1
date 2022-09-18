@@ -18,21 +18,30 @@ namespace Rehnda {
         std::vector<vk::PresentModeKHR> presentModes;
     };
 
-    class RSwapchain {
+    class SwapchainManager {
     public:
-        ~RSwapchain();
+        ~SwapchainManager();
         void initSwapchain(GLFWwindow *window, const vk::PhysicalDevice& physicalDevice, const vk::Device* device, const vk::SurfaceKHR& surface);
         void destroy();
+
+        vk::Extent2D getExtent() const;
+
         static SwapChainSupportDetails
         querySwapChainSupport(const vk::PhysicalDevice &physicalDevice, const vk::SurfaceKHR &surface);
     private:
         bool initialized = false;
+
         vk::SwapchainKHR swapchain;
+        vk::Format swapchainImageFormat;
+        vk::Extent2D swapchainExtent;
         std::vector <vk::Image> swapchainImages;
+        std::vector <vk::ImageView> swapchainImageViews;
 
         NonOwner<const vk::Device*> owningDevice;
 
     private:
+        void createImageViews();
+
         vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats);
 
         vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes);
