@@ -8,4 +8,7 @@ namespace Rehnda {
 
      template<typename T>
      using Owner = gsl::owner<T>;
+
+    template <class T, class = std::enable_if_t<std::is_pointer<T>::value>>
+    using NonOwner = T;
 }

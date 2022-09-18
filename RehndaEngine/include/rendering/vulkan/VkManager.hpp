@@ -10,6 +10,7 @@
 #include <GLFW/glfw3.h>
 
 #include "VkTypes.hpp"
+#include "RSwapchain.hpp"
 
 
 namespace Rehnda {
@@ -23,17 +24,14 @@ namespace Rehnda {
         }
     };
 
-    struct SwapChainSupportDetails {
-        vk::SurfaceCapabilitiesKHR capabilities;
-        std::vector<vk::SurfaceFormatKHR> formats;
-        std::vector<vk::PresentModeKHR> presentModes;
-    };
 
     class VkManager {
     public:
         explicit VkManager(GLFWwindow *window);
 
         ~VkManager();
+
+        static QueueFamilyIndices findQueueFamilies(const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr);
 
     private:
         vk::Instance instance;
@@ -43,8 +41,9 @@ namespace Rehnda {
         vk::Queue graphicsQueue;
         vk::Queue presentQueue;
 
+        RSwapchain swapchain;
+
         vk::SurfaceKHR surface;
-        vk::SwapchainKHR swapchain;
 
         bool enableValidationLayers;
         vk::DebugUtilsMessengerEXT debugMessenger;
@@ -53,23 +52,10 @@ namespace Rehnda {
         [[nodiscard]]
         vk::PhysicalDevice pickPhysicalDevice() const;
 
-        vk::SwapchainKHR createSwapchain(GLFWwindow* window);
-
         static vk::Device createDevice(const vk::PhysicalDevice &physicalDevice, const vk::SurfaceKHR &surfaceKhr);
-
-        static QueueFamilyIndices findQueueFamilies(const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr);
 
         static int rateDeviceSuitability(const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr);
 
         static bool areRequiredExtensionsSupported(const vk::PhysicalDevice &device);
-
-        static SwapChainSupportDetails
-        querySwapChainSupport(const vk::PhysicalDevice &physicalDevice, const vk::SurfaceKHR &surface);
-
-        static vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& availableFormats);
-
-        static vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR>& availablePresentModes);
-
-        static vk::Extent2D chooseSwapExtent(GLFWwindow* window, const vk::SurfaceCapabilitiesKHR& capabilities);
     };
 }
