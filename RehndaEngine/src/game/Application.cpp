@@ -11,6 +11,8 @@ namespace Rehnda {
     void Application::run() {
         while (!window.shouldClose()) {
             window.pollEvents();
+            window.render();
         }
+        window.waitIdle();
     }
 }

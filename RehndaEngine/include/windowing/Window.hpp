@@ -13,19 +13,22 @@ namespace Rehnda::Windowing {
     class Window {
     public:
         explicit Window(Pixels width, Pixels height);
+
         ~Window();
 
         bool shouldClose() const;
+
         void pollEvents();
+
     private:
-        Owner<GLFWwindow*> window;
+        Owner<GLFWwindow *> window;
         Pixels width;
         Pixels height;
 
         std::unique_ptr<VkManager> vkManager;
     public:
         [[nodiscard]]
-        const VkManager* getVkManager() const;
+        const VkManager *getVkManager() const;
 
     public:
         [[nodiscard]]
@@ -36,5 +39,9 @@ namespace Rehnda::Windowing {
 
         [[nodiscard]]
         const Pixels &getHeight() const;
+
+        void render();
+
+        void waitIdle();
     };
 }

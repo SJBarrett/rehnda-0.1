@@ -32,20 +32,30 @@ namespace Rehnda {
 
         ~VkManager();
 
+        void drawFrame();
+
+        void waitForDeviceIdle();
+
         static QueueFamilyIndices findQueueFamilies(const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr);
 
     private:
         vk::Instance instance;
         vk::PhysicalDevice physicalDevice;
         vk::Device device;
+        vk::SurfaceKHR surface;
 
         vk::Queue graphicsQueue;
         vk::Queue presentQueue;
+        vk::CommandPool graphicsCommandPool;
+        vk::CommandBuffer commandBuffer;
 
-        SwapchainManager swapchain;
+        vk::Semaphore imageAvailableSemaphore;
+        vk::Semaphore renderFinishedSemaphore;
+        vk::Fence inFlightFence;
+
+        std::unique_ptr<SwapchainManager> swapchainManager;
         std::unique_ptr<GraphicsPipeline> graphicsPipeline;
 
-        vk::SurfaceKHR surface;
 
         bool enableValidationLayers;
         vk::DebugUtilsMessengerEXT debugMessenger;
@@ -53,6 +63,12 @@ namespace Rehnda {
     private:
         [[nodiscard]]
         vk::PhysicalDevice pickPhysicalDevice() const;
+
+        void initCommandPool();
+
+        void createSyncObjects();
+
+        vk::CommandBuffer createCommandBuffer();
 
         static vk::Device createDevice(const vk::PhysicalDevice &physicalDevice, const vk::SurfaceKHR &surfaceKhr);
 

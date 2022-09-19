@@ -15,6 +15,9 @@ namespace Rehnda {
     public:
         explicit GraphicsPipeline(const vk::Device* device, SwapchainManager* swapchainManager);
         void destroy();
+
+        void recordCommandBuffer(vk::CommandBuffer& commandBuffer, uint32_t imageIndex);
+
     private:
         NonOwner<const vk::Device*> device;
         NonOwner<SwapchainManager*> swapchainManager;
@@ -22,9 +25,11 @@ namespace Rehnda {
         vk::PipelineLayout pipelineLayout;
         vk::RenderPass renderPass;
         vk::Pipeline pipeline;
+
     private:
         vk::ShaderModule createShaderModule(const std::vector<char>& code);
 
         vk::RenderPass createRenderPass();
+
     };
 }

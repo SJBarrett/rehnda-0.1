@@ -20,25 +20,33 @@ namespace Rehnda {
 
     class SwapchainManager {
     public:
+        SwapchainManager(GLFWwindow *window, const vk::PhysicalDevice& physicalDevice, vk::Device* device, const vk::SurfaceKHR& surface);
         ~SwapchainManager();
-        void initSwapchain(GLFWwindow *window, const vk::PhysicalDevice& physicalDevice, const vk::Device* device, const vk::SurfaceKHR& surface);
+        void initSwapchainBuffers(const vk::RenderPass& renderPass);
         void destroy();
+        uint32_t acquireNextImageIndex(vk::Semaphore& imageAvailableSemaphore);
+        void present(const std::vector<vk::Semaphore>& waitSemaphores, vk::Queue& presentQueue, uint32_t imageIndex);
 
         vk::Extent2D getExtent() const;
         vk::Format getImageFormat() const;
+        [[nodiscard]]
+        vk::Framebuffer getSwapchainFramebuffer(size_t bufferIndex) const;
 
         static SwapChainSupportDetails
         querySwapChainSupport(const vk::PhysicalDevice &physicalDevice, const vk::SurfaceKHR &surface);
+
+
     private:
         bool initialized = false;
 
         vk::SwapchainKHR swapchain;
         vk::Format swapchainImageFormat;
         vk::Extent2D swapchainExtent;
-        std::vector <vk::Image> swapchainImages;
-        std::vector <vk::ImageView> swapchainImageViews;
+        std::vector<vk::Image> swapchainImages;
+        std::vector<vk::ImageView> swapchainImageViews;
+        std::vector<vk::Framebuffer> swapchainFramebuffers;
 
-        NonOwner<const vk::Device*> owningDevice;
+        NonOwner<vk::Device*> device;
 
     private:
         void createImageViews();

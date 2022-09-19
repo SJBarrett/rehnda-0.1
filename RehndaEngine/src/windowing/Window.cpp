@@ -41,7 +41,15 @@ namespace Rehnda::Windowing {
         return height;
     }
 
-    const VkManager* Window::getVkManager() const {
+    const VkManager *Window::getVkManager() const {
         return vkManager.get();
+    }
+
+    void Window::render() {
+        vkManager->drawFrame();
+    }
+
+    void Window::waitIdle() {
+        vkManager->waitForDeviceIdle();
     }
 }

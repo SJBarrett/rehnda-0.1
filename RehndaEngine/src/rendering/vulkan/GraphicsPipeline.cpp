@@ -16,9 +16,8 @@ namespace Rehnda {
      * @param device
      * @param swapchainManager
      */
-    GraphicsPipeline::GraphicsPipeline(const vk::Device *device, SwapchainManager *swapchainManager) : device(device),
-                                                                                                       swapchainManager(
-                                                                                                               swapchainManager) {
+    GraphicsPipeline::GraphicsPipeline(const vk::Device *device, SwapchainManager *swapchainManager) :
+            device(device), swapchainManager(swapchainManager) {
         renderPass = createRenderPass();
         auto vertShaderCode = FileUtils::readFileAsBytes("shaders/triangle.vert.spv");
         auto fragShaderCode = FileUtils::readFileAsBytes("shaders/triangle.frag.spv");
@@ -97,41 +96,41 @@ namespace Rehnda {
                                   vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
         };
 
-        vk::PipelineColorBlendStateCreateInfo colorBlending {
-            .logicOpEnable = VK_FALSE,
-            .attachmentCount = 1,
-            .pAttachments = &colorBlendAttachmentState,
+        vk::PipelineColorBlendStateCreateInfo colorBlending{
+                .logicOpEnable = VK_FALSE,
+                .attachmentCount = 1,
+                .pAttachments = &colorBlendAttachmentState,
         };
 
-        vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo {
-            .setLayoutCount = 0,
-            .pSetLayouts = nullptr,
-            .pushConstantRangeCount = 0,
-            .pPushConstantRanges = nullptr,
+        vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{
+                .setLayoutCount = 0,
+                .pSetLayouts = nullptr,
+                .pushConstantRangeCount = 0,
+                .pPushConstantRanges = nullptr,
         };
         pipelineLayout = device->createPipelineLayout(pipelineLayoutCreateInfo);
 
-        vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
-            // --- SHADER STAGE DESCRIPTIONS ---
-            .stageCount = 2,
-            .pStages = shaderStages,
-            // --- FIXED FUNCTION STAGE DESCRIPTION ---
-            .pVertexInputState = &vertexInputCreateInfo,
-            .pInputAssemblyState = &inputAssembly,
-            .pViewportState = &viewportState,
-            .pRasterizationState = &rasterizer,
-            .pMultisampleState = &multisampling,
-            .pDepthStencilState = nullptr,
-            .pColorBlendState = &colorBlending,
-            .pDynamicState = &dynamicStateCreateInfo,
-            // --- PIPELINE LAYOUT ---
-            .layout = pipelineLayout,
-            // --- RENDER PASS ---
-            .renderPass = renderPass,
-            .subpass = 0,
-            // --- OPTIONAL BASE PIPELINE,
-            .basePipelineHandle = VK_NULL_HANDLE,
-            .basePipelineIndex = -1,
+        vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo{
+                // --- SHADER STAGE DESCRIPTIONS ---
+                .stageCount = 2,
+                .pStages = shaderStages,
+                // --- FIXED FUNCTION STAGE DESCRIPTION ---
+                .pVertexInputState = &vertexInputCreateInfo,
+                .pInputAssemblyState = &inputAssembly,
+                .pViewportState = &viewportState,
+                .pRasterizationState = &rasterizer,
+                .pMultisampleState = &multisampling,
+                .pDepthStencilState = nullptr,
+                .pColorBlendState = &colorBlending,
+                .pDynamicState = &dynamicStateCreateInfo,
+                // --- PIPELINE LAYOUT ---
+                .layout = pipelineLayout,
+                // --- RENDER PASS ---
+                .renderPass = renderPass,
+                .subpass = 0,
+                // --- OPTIONAL BASE PIPELINE,
+                .basePipelineHandle = VK_NULL_HANDLE,
+                .basePipelineIndex = -1,
         };
 
         pipeline = device->createGraphicsPipeline(VK_NULL_HANDLE, graphicsPipelineCreateInfo).value;
@@ -139,6 +138,8 @@ namespace Rehnda {
         // shader modules can be destroyed after the spir-v is compiled and linked to machine code during pipeline creation
         device->destroyShaderModule(vertShaderModule);
         device->destroyShaderModule(fragShaderModule);
+
+        swapchainManager->initSwapchainBuffers(renderPass);
     }
 
     vk::ShaderModule GraphicsPipeline::createShaderModule(const std::vector<char> &code) {
@@ -156,37 +157,98 @@ namespace Rehnda {
     }
 
     vk::RenderPass GraphicsPipeline::createRenderPass() {
-        vk::AttachmentDescription colorAttachment {
-            .format = swapchainManager->getImageFormat(),
-            .samples = vk::SampleCountFlagBits::e1,
-            .loadOp = vk::AttachmentLoadOp::eClear,
-            .storeOp = vk::AttachmentStoreOp::eStore,
-            .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
-            .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
-            // since we are clearing at the start, the initial layout doesn't matter
-            .initialLayout = vk::ImageLayout::eUndefined,
-            // since we are rendering to the swapchain we use PresentSrcKHR
-            .finalLayout = vk::ImageLayout::ePresentSrcKHR,
+        vk::AttachmentDescription colorAttachment{
+                .format = swapchainManager->getImageFormat(),
+                .samples = vk::SampleCountFlagBits::e1,
+                .loadOp = vk::AttachmentLoadOp::eClear,
+                .storeOp = vk::AttachmentStoreOp::eStore,
+                .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+                .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+                // since we are clearing at the start, the initial layout doesn't matter
+                .initialLayout = vk::ImageLayout::eUndefined,
+                // since we are rendering to the swapchainManager we use PresentSrcKHR
+                .finalLayout = vk::ImageLayout::ePresentSrcKHR,
         };
-        vk::AttachmentReference colorAttachmentRef {
-            .attachment = 0,
-            .layout = vk::ImageLayout::eColorAttachmentOptimal,
-        };
-
-        vk::SubpassDescription subpass {
-            .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
-            .colorAttachmentCount = 1,
-            // the index of the attachment in the below array is what is referened in the shader (e.g. "layout(location = 0) out vec4 outColor;")
-            .pColorAttachments = &colorAttachmentRef,
+        vk::AttachmentReference colorAttachmentRef{
+                .attachment = 0,
+                .layout = vk::ImageLayout::eColorAttachmentOptimal,
         };
 
-        vk::RenderPassCreateInfo renderPassCreateInfo {
-            .attachmentCount = 1,
-            .pAttachments = &colorAttachment,
-            .subpassCount = 1,
-            .pSubpasses = &subpass,
+        vk::SubpassDescription subpass{
+                .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
+                .colorAttachmentCount = 1,
+                // the index of the attachment in the below array is what is referened in the shader (e.g. "layout(location = 0) out vec4 outColor;")
+                .pColorAttachments = &colorAttachmentRef,
+        };
+
+        vk::SubpassDependency subpassDependency{
+                .srcSubpass = VK_SUBPASS_EXTERNAL, // this refers to the implicit subpass before the render pass
+                .dstSubpass = 0, // this refers to our subpass, the first and only one
+                // we need to wait for the swap chain to finish reading from the image before we access it
+                .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                .srcAccessMask = vk::AccessFlagBits::eNone,
+                .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
+        };
+
+        vk::RenderPassCreateInfo renderPassCreateInfo{
+                .attachmentCount = 1,
+                .pAttachments = &colorAttachment,
+                .subpassCount = 1,
+                .pSubpasses = &subpass,
+                .dependencyCount = 1,
+                .pDependencies = &subpassDependency,
         };
 
         return device->createRenderPass(renderPassCreateInfo);
+    }
+
+
+    void GraphicsPipeline::recordCommandBuffer(vk::CommandBuffer &commandBuffer, uint32_t imageIndex) {
+        vk::CommandBufferBeginInfo beginInfo{};
+        commandBuffer.begin(beginInfo); // this implicitly resets the buffer
+
+        vk::ClearValue clearColor{
+                .color = {
+                        .float32 = {{0.0f, 0.f, 0.f, 1.f}}
+                }
+        };
+
+        vk::RenderPassBeginInfo renderPassBeginInfo{
+                .renderPass = renderPass,
+                .framebuffer = swapchainManager->getSwapchainFramebuffer(imageIndex),
+                .renderArea = {
+                        .offset = {0, 0},
+                        .extent = swapchainManager->getExtent(),
+                },
+                .clearValueCount = 1,
+                .pClearValues = &clearColor,
+        };
+
+        commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+
+        vk::Viewport viewport{
+                .x = 0.0f,
+                .y = 0.0f,
+                .width = static_cast<float>(swapchainManager->getExtent().width),
+                .height = static_cast<float>(swapchainManager->getExtent().height),
+                .minDepth = 0.0f,
+                .maxDepth = 1.0f,
+        };
+        commandBuffer.setViewport(0, 1, &viewport);
+
+        vk::Rect2D scissor{
+                .offset = {0, 0},
+                .extent = swapchainManager->getExtent(),
+        };
+        commandBuffer.setScissor(0, 1, &scissor);
+
+        // vertex count, instance count, first vertex, first instace
+        commandBuffer.draw(3, 1, 0, 0);
+
+        commandBuffer.endRenderPass();
+        commandBuffer.end();
     }
 }
