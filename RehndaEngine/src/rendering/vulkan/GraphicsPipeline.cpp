@@ -7,9 +7,19 @@
 
 namespace Rehnda {
 
+    /**
+     * Summary of what's going on:
+     *  - Shader stages: the shader modules that define the functionality of the programmable stages of the graphics pipeline
+     *  - Fixed-function state: all of the structures that define the fixed-function stages of the pipeline, like input assembly, rasterizer, viewport and color blending
+     *  - Pipeline layout: the uniform and push values referenced by the shader that can be updated at draw time
+     *  - Render pass: the attachments referenced by the pipeline stages and their usage
+     * @param device
+     * @param swapchainManager
+     */
     GraphicsPipeline::GraphicsPipeline(const vk::Device *device, SwapchainManager *swapchainManager) : device(device),
                                                                                                        swapchainManager(
                                                                                                                swapchainManager) {
+        renderPass = createRenderPass();
         auto vertShaderCode = FileUtils::readFileAsBytes("shaders/triangle.vert.spv");
         auto fragShaderCode = FileUtils::readFileAsBytes("shaders/triangle.frag.spv");
 
@@ -45,20 +55,6 @@ namespace Rehnda {
         vk::PipelineInputAssemblyStateCreateInfo inputAssembly{
                 .topology = vk::PrimitiveTopology::eTriangleList,
                 .primitiveRestartEnable = VK_FALSE,
-        };
-
-        vk::Viewport viewport{
-                .x = 0.0f,
-                .y = 0.0f,
-                .width = (float) swapchainManager->getExtent().width,
-                .height = (float) swapchainManager->getExtent().height,
-                .minDepth = 0.0f,
-                .maxDepth = 1.0f,
-        };
-
-        vk::Rect2D scissor = {
-                .offset = {0, 0},
-                .extent = swapchainManager->getExtent(),
         };
 
         // dynamic states allow some limited things to be modified without recreated th epipeline
@@ -115,6 +111,30 @@ namespace Rehnda {
         };
         pipelineLayout = device->createPipelineLayout(pipelineLayoutCreateInfo);
 
+        vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
+            // --- SHADER STAGE DESCRIPTIONS ---
+            .stageCount = 2,
+            .pStages = shaderStages,
+            // --- FIXED FUNCTION STAGE DESCRIPTION ---
+            .pVertexInputState = &vertexInputCreateInfo,
+            .pInputAssemblyState = &inputAssembly,
+            .pViewportState = &viewportState,
+            .pRasterizationState = &rasterizer,
+            .pMultisampleState = &multisampling,
+            .pDepthStencilState = nullptr,
+            .pColorBlendState = &colorBlending,
+            .pDynamicState = &dynamicStateCreateInfo,
+            // --- PIPELINE LAYOUT ---
+            .layout = pipelineLayout,
+            // --- RENDER PASS ---
+            .renderPass = renderPass,
+            .subpass = 0,
+            // --- OPTIONAL BASE PIPELINE,
+            .basePipelineHandle = VK_NULL_HANDLE,
+            .basePipelineIndex = -1,
+        };
+
+        pipeline = device->createGraphicsPipeline(VK_NULL_HANDLE, graphicsPipelineCreateInfo).value;
 
         // shader modules can be destroyed after the spir-v is compiled and linked to machine code during pipeline creation
         device->destroyShaderModule(vertShaderModule);
@@ -130,6 +150,43 @@ namespace Rehnda {
     }
 
     void GraphicsPipeline::destroy() {
+        device->destroyPipeline(pipeline);
         device->destroyPipelineLayout(pipelineLayout);
+        device->destroyRenderPass(renderPass);
+    }
+
+    vk::RenderPass GraphicsPipeline::createRenderPass() {
+        vk::AttachmentDescription colorAttachment {
+            .format = swapchainManager->getImageFormat(),
+            .samples = vk::SampleCountFlagBits::e1,
+            .loadOp = vk::AttachmentLoadOp::eClear,
+            .storeOp = vk::AttachmentStoreOp::eStore,
+            .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+            .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+            // since we are clearing at the start, the initial layout doesn't matter
+            .initialLayout = vk::ImageLayout::eUndefined,
+            // since we are rendering to the swapchain we use PresentSrcKHR
+            .finalLayout = vk::ImageLayout::ePresentSrcKHR,
+        };
+        vk::AttachmentReference colorAttachmentRef {
+            .attachment = 0,
+            .layout = vk::ImageLayout::eColorAttachmentOptimal,
+        };
+
+        vk::SubpassDescription subpass {
+            .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
+            .colorAttachmentCount = 1,
+            // the index of the attachment in the below array is what is referened in the shader (e.g. "layout(location = 0) out vec4 outColor;")
+            .pColorAttachments = &colorAttachmentRef,
+        };
+
+        vk::RenderPassCreateInfo renderPassCreateInfo {
+            .attachmentCount = 1,
+            .pAttachments = &colorAttachment,
+            .subpassCount = 1,
+            .pSubpasses = &subpass,
+        };
+
+        return device->createRenderPass(renderPassCreateInfo);
     }
 }

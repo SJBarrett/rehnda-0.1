@@ -20,8 +20,11 @@ namespace Rehnda {
         NonOwner<SwapchainManager*> swapchainManager;
 
         vk::PipelineLayout pipelineLayout;
-
+        vk::RenderPass renderPass;
+        vk::Pipeline pipeline;
     private:
         vk::ShaderModule createShaderModule(const std::vector<char>& code);
+
+        vk::RenderPass createRenderPass();
     };
 }

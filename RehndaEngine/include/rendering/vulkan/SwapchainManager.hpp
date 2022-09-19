@@ -25,6 +25,7 @@ namespace Rehnda {
         void destroy();
 
         vk::Extent2D getExtent() const;
+        vk::Format getImageFormat() const;
 
         static SwapChainSupportDetails
         querySwapChainSupport(const vk::PhysicalDevice &physicalDevice, const vk::SurfaceKHR &surface);

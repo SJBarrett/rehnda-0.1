@@ -155,5 +155,9 @@ namespace Rehnda {
         return swapchainExtent;
     }
 
+    vk::Format SwapchainManager::getImageFormat() const {
+        return swapchainImageFormat;
+    }
+
 
 }
