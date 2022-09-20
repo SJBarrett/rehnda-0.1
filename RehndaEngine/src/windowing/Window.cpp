@@ -13,7 +13,7 @@ namespace Rehnda::Windowing {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
         window = glfwCreateWindow(width.get(), height.get(), "Rehnda", nullptr, nullptr);
-        vkManager = std::make_unique<VkManager>(window);
+        vulkanRenderer = std::make_unique<VulkanRenderer>(window);
     }
 
     Window::~Window() {
@@ -41,15 +41,15 @@ namespace Rehnda::Windowing {
         return height;
     }
 
-    const VkManager *Window::getVkManager() const {
-        return vkManager.get();
+    const VulkanRenderer *Window::getVulkanRenderer() const {
+        return vulkanRenderer.get();
     }
 
     void Window::render() {
-        vkManager->drawFrame();
+        vulkanRenderer->drawFrame();
     }
 
     void Window::waitIdle() {
-        vkManager->waitForDeviceIdle();
+        vulkanRenderer->waitForDeviceIdle();
     }
 }

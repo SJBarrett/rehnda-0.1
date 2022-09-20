@@ -3,13 +3,12 @@
 //
 
 #include "rendering/vulkan/SwapchainManager.hpp"
-#include "rendering/vulkan/VkManager.hpp"
 #include <limits>
 #include <spdlog/spdlog.h>
 
 namespace Rehnda {
     SwapchainManager::SwapchainManager(GLFWwindow *window, const vk::PhysicalDevice &physicalDevice, vk::Device *device,
-                                       const vk::SurfaceKHR &surface) : device(device) {
+                                       const vk::SurfaceKHR &surface, QueueFamilyIndices indices) : device(device) {
         SwapChainSupportDetails swapChainSupportDetails = querySwapChainSupport(physicalDevice, surface);
         const auto surfaceFormat = chooseSwapSurfaceFormat(swapChainSupportDetails.formats);
         const auto presentMode = chooseSwapPresentMode(swapChainSupportDetails.presentModes);
@@ -35,11 +34,10 @@ namespace Rehnda {
                 .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
         };
 
-        QueueFamilyIndices indices = VkManager::findQueueFamilies(physicalDevice, surface);
-        uint32_t queueFamilyIndices[] = {indices.graphicsQueueIndex.value().get(),
-                                         indices.presentQueueIndex.value().get()};
+        uint32_t queueFamilyIndices[] = {indices.graphicsQueueIndex.value(),
+                                         indices.presentQueueIndex.value()};
 
-        if (indices.graphicsQueueIndex.value().get() != indices.presentQueueIndex.value().get()) {
+        if (indices.graphicsQueueIndex.value() != indices.presentQueueIndex.value()) {
             createInfo.imageSharingMode = vk::SharingMode::eConcurrent;
             createInfo.queueFamilyIndexCount = 2;
             createInfo.pQueueFamilyIndices = queueFamilyIndices;
@@ -58,12 +56,10 @@ namespace Rehnda {
         createInfo.clipped = VK_TRUE; // if our window is partially hidden, we don't care about rendering those hidden values
         // if the window is resized the swapchainManager needs to be re-created, and the previous swap chain referenced
         createInfo.oldSwapchain = VK_NULL_HANDLE;
-
         swapchain = device->createSwapchainKHR(createInfo);
         swapchainImages = device->getSwapchainImagesKHR(swapchain);
 
         createImageViews();
-        initialized = true;
     }
 
     void SwapchainManager::createImageViews() {
@@ -144,25 +140,17 @@ namespace Rehnda {
         }
     }
 
-    SwapchainManager::~SwapchainManager() {
-        assert(!initialized);
-    }
-
     void SwapchainManager::destroy() {
-        if (device == nullptr) {
-            SPDLOG_WARN("Tried to destroy a swapchainManager that hasn't been initialized!");
-        } else {
-            initialized = false;
-            for (auto framebuffer: swapchainFramebuffers) {
-                device->destroyFramebuffer(framebuffer);
-            }
-            swapchainFramebuffers.clear();
-            device->destroySwapchainKHR(swapchain);
-            for (auto &swapchainImageView: swapchainImageViews) {
-                device->destroyImageView(swapchainImageView);
-            }
-            swapchainImageViews.clear();
+        for (auto framebuffer: swapchainFramebuffers) {
+            device->destroyFramebuffer(framebuffer);
         }
+        swapchainFramebuffers.clear();
+        device->destroySwapchainKHR(swapchain);
+        for (auto &swapchainImageView: swapchainImageViews) {
+            device->destroyImageView(swapchainImageView);
+        }
+        swapchainImageViews.clear();
+        destroyed = true;
     }
 
     vk::Extent2D SwapchainManager::getExtent() const {
@@ -214,5 +202,9 @@ namespace Rehnda {
         };
         const auto presentResult = presentQueue.presentKHR(presentInfoKhr);
         assert(presentResult == vk::Result::eSuccess);
+    }
+
+    SwapchainManager::~SwapchainManager() {
+        assert(destroyed);
     }
 }

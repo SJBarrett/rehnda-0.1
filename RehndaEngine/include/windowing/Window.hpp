@@ -7,7 +7,7 @@
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.hpp>
 #include "core/CoreTypes.hpp"
-#include "rendering/vulkan/VkManager.hpp"
+#include "rendering/vulkan/VulkanRenderer.hpp"
 
 namespace Rehnda::Windowing {
     class Window {
@@ -25,10 +25,10 @@ namespace Rehnda::Windowing {
         Pixels width;
         Pixels height;
 
-        std::unique_ptr<VkManager> vkManager;
+        std::unique_ptr<VulkanRenderer> vulkanRenderer;
     public:
         [[nodiscard]]
-        const VkManager *getVkManager() const;
+        const VulkanRenderer *getVulkanRenderer() const;
 
     public:
         [[nodiscard]]

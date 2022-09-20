@@ -9,6 +9,7 @@
 #include <vulkan/vulkan.hpp>
 #include <GLFW/glfw3.h>
 #include "core/CoreTypes.hpp"
+#include "VkTypes.hpp"
 
 
 namespace Rehnda {
@@ -20,7 +21,7 @@ namespace Rehnda {
 
     class SwapchainManager {
     public:
-        SwapchainManager(GLFWwindow *window, const vk::PhysicalDevice& physicalDevice, vk::Device* device, const vk::SurfaceKHR& surface);
+        SwapchainManager(GLFWwindow *window, const vk::PhysicalDevice& physicalDevice, vk::Device* device, const vk::SurfaceKHR& surface, QueueFamilyIndices queueFamilyIndices);
         ~SwapchainManager();
         void initSwapchainBuffers(const vk::RenderPass& renderPass);
         void destroy();
@@ -37,7 +38,7 @@ namespace Rehnda {
 
 
     private:
-        bool initialized = false;
+        bool destroyed = false;
 
         vk::SwapchainKHR swapchain;
         vk::Format swapchainImageFormat;

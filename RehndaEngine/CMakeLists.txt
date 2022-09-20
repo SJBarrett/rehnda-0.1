@@ -40,10 +40,12 @@ set(SOURCE_FILES
         src/game/Application.cpp
         src/rendering/vulkan/VkInstanceHelpers.cpp
         src/rendering/vulkan/VkDebugHelpers.cpp
-        src/rendering/vulkan/VkManager.cpp
+        src/rendering/vulkan/FrameCoordinator.cpp
         src/rendering/vulkan/SwapchainManager.cpp
         src/rendering/vulkan/GraphicsPipeline.cpp
-        src/core/FileUtils.cpp)
+        src/rendering/vulkan/VulkanRenderer.cpp
+        src/core/FileUtils.cpp
+        )
 
 add_executable(${ENGINE_TARGET_NAME} ${SOURCE_FILES})
 set_property(TARGET ${ENGINE_TARGET_NAME} PROPERTY CXX_STANDARD 20)

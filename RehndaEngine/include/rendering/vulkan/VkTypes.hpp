@@ -4,8 +4,13 @@
 #include <optional>
 
 namespace Rehnda {
-     using GraphicsQueueIndex = fluent::NamedType<uint32_t , struct GraphicsQueueIndexTag>;
-     using PresentQueueIndex = fluent::NamedType<uint32_t , struct PresentQueueIndexTag>;
+    struct QueueFamilyIndices {
+        std::optional<uint32_t> graphicsQueueIndex;
+        std::optional<uint32_t> presentQueueIndex;
 
-
+        [[nodiscard]]
+        bool requiredFamiliesFound() const {
+            return graphicsQueueIndex.has_value() && presentQueueIndex.has_value();
+        }
+    };
 }
