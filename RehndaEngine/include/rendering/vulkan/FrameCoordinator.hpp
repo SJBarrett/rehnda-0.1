@@ -24,6 +24,9 @@ namespace Rehnda {
         void drawFrame();
 
     private:
+        const size_t MAX_FRAMES_IN_FLIGHT = 2;
+        size_t currentFrame = 0;
+
         NonOwner<vk::Device*> device;
         NonOwner<SwapchainManager*> swapchainManager;
         QueueFamilyIndices queueFamilyIndices;
@@ -31,11 +34,11 @@ namespace Rehnda {
         vk::Queue graphicsQueue;
         vk::Queue presentQueue;
         vk::CommandPool graphicsCommandPool;
-        vk::CommandBuffer commandBuffer;
+        std::vector<vk::CommandBuffer> commandBuffers;
 
-        vk::Semaphore imageAvailableSemaphore;
-        vk::Semaphore renderFinishedSemaphore;
-        vk::Fence inFlightFence;
+        std::vector<vk::Semaphore> imageAvailableSemaphores;
+        std::vector<vk::Semaphore> renderFinishedSemaphores;
+        std::vector<vk::Fence> inFlightFences;
 
         std::unique_ptr<GraphicsPipeline> graphicsPipeline;
 
@@ -45,6 +48,6 @@ namespace Rehnda {
 
         void createSyncObjects();
 
-        vk::CommandBuffer createCommandBuffer();
+        void createCommandBuffers();
     };
 }
