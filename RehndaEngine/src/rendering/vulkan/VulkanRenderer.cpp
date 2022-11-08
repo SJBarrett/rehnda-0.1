@@ -16,7 +16,7 @@ const std::vector<const char *> requiredDeviceExtensions = {
 };
 
 namespace Rehnda {
-    VulkanRenderer::VulkanRenderer(GLFWwindow *window) {
+    VulkanRenderer::VulkanRenderer(GLFWwindow *window) : window(window) {
 #ifdef NDEBUG
         enableValidationLayers = false;
 #else
@@ -44,8 +44,8 @@ namespace Rehnda {
         if (enableValidationLayers) {
             VkDebugHelpers::destroy_debug_messenger(instance, debugMessenger);
         }
-        frameCoordinator->destroy();
         swapchainManager->destroy();
+        frameCoordinator->destroy();
         device.destroy();
         instance.destroySurfaceKHR(surface);
         instance.destroy();
@@ -185,6 +185,18 @@ namespace Rehnda {
     }
 
     void VulkanRenderer::drawFrame() {
-        frameCoordinator->drawFrame();
+
+        switch (frameCoordinator->drawFrame()) {
+            case DrawFrameResult::SWAPCHAIN_OUT_OF_DATE:
+                swapchainManager->resize(window, physicalDevice, surface, queueFamilyIndices, frameCoordinator->getGraphicsPipeline().getRenderPass());
+                break;
+            case DrawFrameResult::SUCCESS:
+            default:
+                break;
+        };
+    }
+
+    void VulkanRenderer::resize() {
+        frameCoordinator->setFramebufferResized();
     }
 }

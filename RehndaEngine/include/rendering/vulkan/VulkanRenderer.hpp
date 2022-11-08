@@ -19,9 +19,13 @@ namespace Rehnda {
 
         void drawFrame();
 
+        void resize();
+
         void waitForDeviceIdle();
 
     private:
+        NonOwner<GLFWwindow*> window;
+
         vk::Instance instance;
         vk::SurfaceKHR surface;
         vk::PhysicalDevice physicalDevice;

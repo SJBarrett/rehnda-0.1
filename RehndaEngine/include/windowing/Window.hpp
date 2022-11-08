@@ -20,6 +20,8 @@ namespace Rehnda::Windowing {
 
         void pollEvents();
 
+        void resize();
+
     private:
         Owner<GLFWwindow *> window;
         Pixels width;
@@ -30,7 +32,6 @@ namespace Rehnda::Windowing {
         [[nodiscard]]
         const VulkanRenderer *getVulkanRenderer() const;
 
-    public:
         [[nodiscard]]
         const GLFWwindow *getWindow() const;
 
@@ -43,5 +44,8 @@ namespace Rehnda::Windowing {
         void render();
 
         void waitIdle();
+
+    private:
+        bool isWindowMinimized() const;
     };
 }

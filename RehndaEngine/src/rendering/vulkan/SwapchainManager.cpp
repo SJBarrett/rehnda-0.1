@@ -9,6 +9,13 @@
 namespace Rehnda {
     SwapchainManager::SwapchainManager(GLFWwindow *window, const vk::PhysicalDevice &physicalDevice, vk::Device *device,
                                        const vk::SurfaceKHR &surface, QueueFamilyIndices indices) : device(device) {
+        createSwapchain(window, physicalDevice, device, surface, indices);
+        createImageViews();
+    }
+
+    void SwapchainManager::createSwapchain(GLFWwindow *window, const vk::PhysicalDevice &physicalDevice,
+                                           const vk::Device *device, const vk::SurfaceKHR &surface,
+                                           QueueFamilyIndices &indices) {
         SwapChainSupportDetails swapChainSupportDetails = querySwapChainSupport(physicalDevice, surface);
         const auto surfaceFormat = chooseSwapSurfaceFormat(swapChainSupportDetails.formats);
         const auto presentMode = chooseSwapPresentMode(swapChainSupportDetails.presentModes);
@@ -54,12 +61,19 @@ namespace Rehnda {
 
         createInfo.presentMode = presentMode;
         createInfo.clipped = VK_TRUE; // if our window is partially hidden, we don't care about rendering those hidden values
-        // if the window is resized the swapchainManager needs to be re-created, and the previous swap chain referenced
+// if the window is resized the swapchainManager needs to be re-created, and the previous swap chain referenced
         createInfo.oldSwapchain = VK_NULL_HANDLE;
         swapchain = device->createSwapchainKHR(createInfo);
         swapchainImages = device->getSwapchainImagesKHR(swapchain);
+    }
 
+    void SwapchainManager::resize(GLFWwindow *window, const vk::PhysicalDevice &physicalDevice,
+                                  const vk::SurfaceKHR &surface, QueueFamilyIndices indices, const vk::RenderPass &renderPass) {
+        device->waitIdle();
+        cleanupResources();
+        createSwapchain(window, physicalDevice, device, surface, indices);
         createImageViews();
+        initSwapchainBuffers(renderPass);
     }
 
     void SwapchainManager::createImageViews() {
@@ -140,16 +154,19 @@ namespace Rehnda {
         }
     }
 
-    void SwapchainManager::destroy() {
+    void SwapchainManager::cleanupResources() {
+        // TODO: To support moving between SDR and HDR monitors the renderpass would need to be recreated too
         for (auto framebuffer: swapchainFramebuffers) {
             device->destroyFramebuffer(framebuffer);
         }
-        swapchainFramebuffers.clear();
         device->destroySwapchainKHR(swapchain);
         for (auto &swapchainImageView: swapchainImageViews) {
             device->destroyImageView(swapchainImageView);
         }
-        swapchainImageViews.clear();
+    }
+
+    void SwapchainManager::destroy() {
+        cleanupResources();
         destroyed = true;
     }
 
@@ -186,11 +203,11 @@ namespace Rehnda {
         return swapchainFramebuffers[bufferIndex];
     }
 
-    uint32_t SwapchainManager::acquireNextImageIndex(vk::Semaphore &imageAvailableSemaphore) {
-        return device->acquireNextImageKHR(swapchain, UINT64_MAX, imageAvailableSemaphore).value;
+    vk::ResultValue<uint32_t> SwapchainManager::acquireNextImageIndex(vk::Semaphore &imageAvailableSemaphore) {
+        return device->acquireNextImageKHR(swapchain, UINT64_MAX, imageAvailableSemaphore);
     }
 
-    void SwapchainManager::present(const std::vector<vk::Semaphore> &waitSemaphores, vk::Queue &presentQueue,
+    PresentResult SwapchainManager::present(const std::vector<vk::Semaphore> &waitSemaphores, vk::Queue &presentQueue,
                                    uint32_t imageIndex) {
         vk::SwapchainKHR swapChains[] = {swapchain};
         vk::PresentInfoKHR presentInfoKhr{
@@ -201,7 +218,11 @@ namespace Rehnda {
                 .pImageIndices = &imageIndex,
         };
         const auto presentResult = presentQueue.presentKHR(presentInfoKhr);
+        if (presentResult == vk::Result::eErrorOutOfDateKHR || presentResult == vk::Result::eSuboptimalKHR) {
+            return PresentResult::SWAPCHAIN_OUT_OF_DATE;
+        }
         assert(presentResult == vk::Result::eSuccess);
+        return PresentResult::SUCCESS;
     }
 
     SwapchainManager::~SwapchainManager() {

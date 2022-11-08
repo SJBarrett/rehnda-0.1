@@ -79,12 +79,23 @@ namespace Rehnda {
      * 4. Submit the recorded command buffer
      * 5. Present the swap chain image
      */
-    void FrameCoordinator::drawFrame() {
+    DrawFrameResult FrameCoordinator::drawFrame() {
+        // waiting for fences would fail if we exit this method early and reset fences immediately before new work is submitted
         const auto waitResult = device->waitForFences({inFlightFences[currentFrame]}, VK_TRUE, UINT64_MAX);
         assert(waitResult == vk::Result::eSuccess);
+
+        vk::ResultValue<uint32_t> nextImageIndexResult = swapchainManager->acquireNextImageIndex(imageAvailableSemaphores[currentFrame]);
+        if (nextImageIndexResult.result == vk::Result::eErrorOutOfDateKHR || framebufferResized) {
+            framebufferResized = false;
+            return DrawFrameResult::SWAPCHAIN_OUT_OF_DATE;
+        } else if (nextImageIndexResult.result != vk::Result::eSuccess && nextImageIndexResult.result != vk::Result::eSuboptimalKHR) {
+            throw std::runtime_error("Failed to acquire swap chain image");
+        }
+        auto nextImageIndex = nextImageIndexResult.value;
+
+        // reset only once we have submitted work and know we won't exit early due to swapchain out of date
         device->resetFences({inFlightFences[currentFrame]});
 
-        uint32_t nextImageIndex = swapchainManager->acquireNextImageIndex(imageAvailableSemaphores[currentFrame]);
         commandBuffers[currentFrame].reset();
         graphicsPipeline->recordCommandBuffer(commandBuffers[currentFrame], nextImageIndex);
 
@@ -103,12 +114,24 @@ namespace Rehnda {
 
         const auto submitResult = graphicsQueue.submit(1, &submitInfo, inFlightFences[currentFrame]);
         assert(submitResult == vk::Result::eSuccess);
-        swapchainManager->present(signalSemaphores, presentQueue, nextImageIndex);
+
+        if (swapchainManager->present(signalSemaphores, presentQueue, nextImageIndex) == PresentResult::SWAPCHAIN_OUT_OF_DATE) {
+            return DrawFrameResult::SWAPCHAIN_OUT_OF_DATE;
+        };
 
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+        return DrawFrameResult::SUCCESS;
     }
 
     FrameCoordinator::~FrameCoordinator() {
         assert(destroyed);
+    }
+
+    GraphicsPipeline &FrameCoordinator::getGraphicsPipeline() const {
+        return *graphicsPipeline;
+    }
+
+    void FrameCoordinator::setFramebufferResized() {
+        framebufferResized = true;
     }
 }

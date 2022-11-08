@@ -15,20 +15,33 @@
 
 
 namespace Rehnda {
+    enum class DrawFrameResult {
+        SUCCESS,
+        SWAPCHAIN_OUT_OF_DATE,
+    };
+
     class FrameCoordinator {
     public:
-        FrameCoordinator(NonOwner<vk::Device*> device, NonOwner<SwapchainManager*> swapchainManager, QueueFamilyIndices queueFamilyIndices);
+        FrameCoordinator(NonOwner<vk::Device *> device, NonOwner<SwapchainManager *> swapchainManager,
+                         QueueFamilyIndices queueFamilyIndices);
+
         ~FrameCoordinator();
+
         void destroy();
 
-        void drawFrame();
+        DrawFrameResult drawFrame();
+
+        GraphicsPipeline& getGraphicsPipeline() const;
+
+        void setFramebufferResized();
 
     private:
         const size_t MAX_FRAMES_IN_FLIGHT = 2;
         size_t currentFrame = 0;
+        bool framebufferResized = false;
 
-        NonOwner<vk::Device*> device;
-        NonOwner<SwapchainManager*> swapchainManager;
+        NonOwner<vk::Device *> device;
+        NonOwner<SwapchainManager *> swapchainManager;
         QueueFamilyIndices queueFamilyIndices;
 
         vk::Queue graphicsQueue;

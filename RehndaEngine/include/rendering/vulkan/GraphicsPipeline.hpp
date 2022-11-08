@@ -18,6 +18,9 @@ namespace Rehnda {
 
         void recordCommandBuffer(vk::CommandBuffer& commandBuffer, uint32_t imageIndex);
 
+        [[nodiscard]]
+        vk::RenderPass getRenderPass() const;
+
     private:
         NonOwner<const vk::Device*> device;
         NonOwner<SwapchainManager*> swapchainManager;

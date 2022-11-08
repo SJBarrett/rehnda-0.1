@@ -251,4 +251,8 @@ namespace Rehnda {
         commandBuffer.endRenderPass();
         commandBuffer.end();
     }
+
+    vk::RenderPass GraphicsPipeline::getRenderPass() const {
+        return renderPass;
+    }
 }
