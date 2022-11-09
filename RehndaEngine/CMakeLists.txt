@@ -43,9 +43,10 @@ set(SOURCE_FILES
         src/rendering/vulkan/FrameCoordinator.cpp
         src/rendering/vulkan/SwapchainManager.cpp
         src/rendering/vulkan/GraphicsPipeline.cpp
+        src/rendering/vulkan/VertexBuffer.cpp
         src/rendering/vulkan/VulkanRenderer.cpp
         src/core/FileUtils.cpp
-        )
+        src/rendering/Vertex.cpp)
 
 add_executable(${ENGINE_TARGET_NAME} ${SOURCE_FILES})
 set_property(TARGET ${ENGINE_TARGET_NAME} PROPERTY CXX_STANDARD 20)

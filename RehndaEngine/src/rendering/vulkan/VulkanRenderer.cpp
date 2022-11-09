@@ -37,7 +37,7 @@ namespace Rehnda {
 
         createDevice();
         initSwapchain(window);
-        frameCoordinator = std::make_unique<FrameCoordinator>(&device, swapchainManager.get(), queueFamilyIndices);
+        frameCoordinator = std::make_unique<FrameCoordinator>(device, physicalDevice, swapchainManager.get(), queueFamilyIndices);
     }
 
     VulkanRenderer::~VulkanRenderer() {

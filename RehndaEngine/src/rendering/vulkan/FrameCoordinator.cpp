@@ -12,25 +12,25 @@
 
 namespace Rehnda {
 
-    FrameCoordinator::FrameCoordinator(NonOwner<vk::Device*> device, NonOwner<SwapchainManager*> swapchainManager, QueueFamilyIndices queueFamilyIndices) : device(device), swapchainManager(swapchainManager),
+    FrameCoordinator::FrameCoordinator(vk::Device& device, vk::PhysicalDevice& physicalDevice, NonOwner<SwapchainManager*> swapchainManager, QueueFamilyIndices queueFamilyIndices) : device(device), swapchainManager(swapchainManager),
                                                                                                                                                             queueFamilyIndices(queueFamilyIndices) {
-        graphicsQueue = device->getQueue(queueFamilyIndices.graphicsQueueIndex.value(), 0);
-        presentQueue = device->getQueue(queueFamilyIndices.presentQueueIndex.value(), 0);
+        graphicsQueue =device.getQueue(queueFamilyIndices.graphicsQueueIndex.value(), 0);
+        presentQueue =device.getQueue(queueFamilyIndices.presentQueueIndex.value(), 0);
 
         initCommandPool();
         createCommandBuffers();
-        graphicsPipeline = std::make_unique<GraphicsPipeline>(device, swapchainManager);
+        graphicsPipeline = std::make_unique<GraphicsPipeline>(device, physicalDevice, swapchainManager);
         createSyncObjects();
     }
 
     void FrameCoordinator::destroy() {
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            device->destroySemaphore(imageAvailableSemaphores[i]);
-            device->destroySemaphore(renderFinishedSemaphores[i]);
-            device->destroyFence(inFlightFences[i]);
+           device.destroySemaphore(imageAvailableSemaphores[i]);
+           device.destroySemaphore(renderFinishedSemaphores[i]);
+           device.destroyFence(inFlightFences[i]);
         }
         graphicsPipeline->destroy();
-        device->destroyCommandPool(graphicsCommandPool);
+       device.destroyCommandPool(graphicsCommandPool);
         destroyed = true;
     }
 
@@ -40,7 +40,7 @@ namespace Rehnda {
             .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
             .queueFamilyIndex = queueFamilyIndices.graphicsQueueIndex.value(),
         };
-        graphicsCommandPool = device->createCommandPool(poolCreateInfo);
+        graphicsCommandPool =device.createCommandPool(poolCreateInfo);
     }
 
     void FrameCoordinator::createSyncObjects() {
@@ -55,9 +55,9 @@ namespace Rehnda {
         };
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            imageAvailableSemaphores[i] = device->createSemaphore(semaphoreCreateInfo);
-            renderFinishedSemaphores[i] = device->createSemaphore(semaphoreCreateInfo);
-            inFlightFences[i] = device->createFence(fenceCreateInfo);
+            imageAvailableSemaphores[i] =device.createSemaphore(semaphoreCreateInfo);
+            renderFinishedSemaphores[i] =device.createSemaphore(semaphoreCreateInfo);
+            inFlightFences[i] =device.createFence(fenceCreateInfo);
         }
     }
 
@@ -68,7 +68,7 @@ namespace Rehnda {
                 .level = vk::CommandBufferLevel::ePrimary,
                 .commandBufferCount = static_cast<uint32_t>(commandBuffers.size()),
         };
-        commandBuffers = device->allocateCommandBuffers(commandBufferAllocateInfo);
+        commandBuffers =device.allocateCommandBuffers(commandBufferAllocateInfo);
     }
 
     /**
@@ -81,7 +81,7 @@ namespace Rehnda {
      */
     DrawFrameResult FrameCoordinator::drawFrame() {
         // waiting for fences would fail if we exit this method early and reset fences immediately before new work is submitted
-        const auto waitResult = device->waitForFences({inFlightFences[currentFrame]}, VK_TRUE, UINT64_MAX);
+        const auto waitResult =device.waitForFences({inFlightFences[currentFrame]}, VK_TRUE, UINT64_MAX);
         assert(waitResult == vk::Result::eSuccess);
 
         vk::ResultValue<uint32_t> nextImageIndexResult = swapchainManager->acquireNextImageIndex(imageAvailableSemaphores[currentFrame]);
@@ -94,7 +94,7 @@ namespace Rehnda {
         auto nextImageIndex = nextImageIndexResult.value;
 
         // reset only once we have submitted work and know we won't exit early due to swapchain out of date
-        device->resetFences({inFlightFences[currentFrame]});
+       device.resetFences({inFlightFences[currentFrame]});
 
         commandBuffers[currentFrame].reset();
         graphicsPipeline->recordCommandBuffer(commandBuffers[currentFrame], nextImageIndex);

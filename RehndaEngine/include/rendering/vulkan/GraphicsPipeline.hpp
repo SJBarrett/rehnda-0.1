@@ -9,11 +9,12 @@
 #include <vulkan/vulkan.hpp>
 #include "core/CoreTypes.hpp"
 #include "SwapchainManager.hpp"
+#include "VertexBuffer.hpp"
 
 namespace Rehnda {
     class GraphicsPipeline {
     public:
-        explicit GraphicsPipeline(const vk::Device* device, SwapchainManager* swapchainManager);
+        explicit GraphicsPipeline(vk::Device& device, vk::PhysicalDevice& physicalDevice, SwapchainManager* swapchainManager);
         void destroy();
 
         void recordCommandBuffer(vk::CommandBuffer& commandBuffer, uint32_t imageIndex);
@@ -22,12 +23,15 @@ namespace Rehnda {
         vk::RenderPass getRenderPass() const;
 
     private:
-        NonOwner<const vk::Device*> device;
+        vk::Device& device;
         NonOwner<SwapchainManager*> swapchainManager;
 
         vk::PipelineLayout pipelineLayout;
         vk::RenderPass renderPass;
         vk::Pipeline pipeline;
+
+        // temp variables
+        VertexBuffer vertexBuffer;
 
     private:
         vk::ShaderModule createShaderModule(const std::vector<char>& code);

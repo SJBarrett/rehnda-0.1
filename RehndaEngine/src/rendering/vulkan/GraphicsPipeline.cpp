@@ -4,8 +4,14 @@
 
 #include "rendering/vulkan/GraphicsPipeline.hpp"
 #include "core/FileUtils.hpp"
+#include "rendering/Vertex.hpp"
 
 namespace Rehnda {
+    const std::vector<Vertex> vertices = {
+            {{0.0f,  -0.5f}, {1.0f, 1.0f, 1.0f}},
+            {{0.5f,  0.5f},  {0.0f, 1.0f, 0.0f}},
+            {{-0.5f, 0.5f},  {0.0f, 0.0f, 1.0f}}
+    };
 
     /**
      * Summary of what's going on:
@@ -16,8 +22,9 @@ namespace Rehnda {
      * @param device
      * @param swapchainManager
      */
-    GraphicsPipeline::GraphicsPipeline(const vk::Device *device, SwapchainManager *swapchainManager) :
-            device(device), swapchainManager(swapchainManager) {
+    GraphicsPipeline::GraphicsPipeline(vk::Device &device, vk::PhysicalDevice &physicalDevice,
+                                       SwapchainManager *swapchainManager) :
+            device(device), swapchainManager(swapchainManager), vertexBuffer(device, physicalDevice, vertices) {
         renderPass = createRenderPass();
         auto vertShaderCode = FileUtils::readFileAsBytes("shaders/triangle.vert.spv");
         auto fragShaderCode = FileUtils::readFileAsBytes("shaders/triangle.frag.spv");
@@ -40,14 +47,17 @@ namespace Rehnda {
 
         vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageCreateInfo, fragShaderStageCreateInfo};
 
+        const auto vertBindingDescription = Vertex::getBindingDescription();
+        const auto vertAttributeDescriptions = Vertex::getAttributeDescriptions();
+
         // describe the format of the vertex data to be passed in
         vk::PipelineVertexInputStateCreateInfo vertexInputCreateInfo{
                 // bindings specify spacing between data and whether per-vertex or instance
-                .vertexBindingDescriptionCount = 0,
-                .pVertexBindingDescriptions = nullptr,
+                .vertexBindingDescriptionCount = 1,
+                .pVertexBindingDescriptions = &vertBindingDescription,
                 // attributes describe the type of attributes passed, which binding to load them from and at what offset
-                .vertexAttributeDescriptionCount = 0,
-                .pVertexAttributeDescriptions = nullptr,
+                .vertexAttributeDescriptionCount = static_cast<uint32_t>(vertAttributeDescriptions.size()),
+                .pVertexAttributeDescriptions = vertAttributeDescriptions.data(),
         };
 
         // input assembly describes what kind of geometry will be drawn from vertices, and if primitive restart should be enabled
@@ -108,7 +118,7 @@ namespace Rehnda {
                 .pushConstantRangeCount = 0,
                 .pPushConstantRanges = nullptr,
         };
-        pipelineLayout = device->createPipelineLayout(pipelineLayoutCreateInfo);
+        pipelineLayout = device.createPipelineLayout(pipelineLayoutCreateInfo);
 
         vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo{
                 // --- SHADER STAGE DESCRIPTIONS ---
@@ -133,11 +143,11 @@ namespace Rehnda {
                 .basePipelineIndex = -1,
         };
 
-        pipeline = device->createGraphicsPipeline(VK_NULL_HANDLE, graphicsPipelineCreateInfo).value;
+        pipeline = device.createGraphicsPipeline(VK_NULL_HANDLE, graphicsPipelineCreateInfo).value;
 
         // shader modules can be destroyed after the spir-v is compiled and linked to machine code during pipeline creation
-        device->destroyShaderModule(vertShaderModule);
-        device->destroyShaderModule(fragShaderModule);
+        device.destroyShaderModule(vertShaderModule);
+        device.destroyShaderModule(fragShaderModule);
 
         swapchainManager->initSwapchainBuffers(renderPass);
     }
@@ -147,13 +157,14 @@ namespace Rehnda {
                 .codeSize = code.size(),
                 .pCode = reinterpret_cast<const uint32_t *>(code.data()),
         };
-        return device->createShaderModule(createInfo);
+        return device.createShaderModule(createInfo);
     }
 
     void GraphicsPipeline::destroy() {
-        device->destroyPipeline(pipeline);
-        device->destroyPipelineLayout(pipelineLayout);
-        device->destroyRenderPass(renderPass);
+        vertexBuffer.~VertexBuffer();
+        device.destroyPipeline(pipeline);
+        device.destroyPipelineLayout(pipelineLayout);
+        device.destroyRenderPass(renderPass);
     }
 
     vk::RenderPass GraphicsPipeline::createRenderPass() {
@@ -200,7 +211,7 @@ namespace Rehnda {
                 .pDependencies = &subpassDependency,
         };
 
-        return device->createRenderPass(renderPassCreateInfo);
+        return device.createRenderPass(renderPassCreateInfo);
     }
 
 
@@ -245,8 +256,12 @@ namespace Rehnda {
         };
         commandBuffer.setScissor(0, 1, &scissor);
 
-        // vertex count, instance count, first vertex, first instace
-        commandBuffer.draw(3, 1, 0, 0);
+        vk::Buffer vertexBuffers[] = {vertexBuffer.getBuffer()};
+        vk::DeviceSize offsets[] = {0};
+        commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
+
+        // vertex count, instance count, first vertex, first instance
+        commandBuffer.draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
         commandBuffer.endRenderPass();
         commandBuffer.end();

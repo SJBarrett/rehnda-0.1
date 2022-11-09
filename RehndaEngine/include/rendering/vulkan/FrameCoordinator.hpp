@@ -22,7 +22,7 @@ namespace Rehnda {
 
     class FrameCoordinator {
     public:
-        FrameCoordinator(NonOwner<vk::Device *> device, NonOwner<SwapchainManager *> swapchainManager,
+        FrameCoordinator(vk::Device& device, vk::PhysicalDevice& physicalDevice, NonOwner<SwapchainManager *> swapchainManager,
                          QueueFamilyIndices queueFamilyIndices);
 
         ~FrameCoordinator();
@@ -40,7 +40,7 @@ namespace Rehnda {
         size_t currentFrame = 0;
         bool framebufferResized = false;
 
-        NonOwner<vk::Device *> device;
+        vk::Device& device;
         NonOwner<SwapchainManager *> swapchainManager;
         QueueFamilyIndices queueFamilyIndices;
 
