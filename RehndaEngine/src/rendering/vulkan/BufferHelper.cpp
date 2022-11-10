@@ -9,13 +9,13 @@ namespace Rehnda::BufferHelper {
         vk::BufferCreateInfo bufferCreateInfo {
                 .size = props.size,
                 .usage = props.bufferUsage,
-                // this vertexBuffer is only used by the graphics queue, so can be exclusive
+                // this buffer is only used by the graphics queue, so can be exclusive
                 .sharingMode = vk::SharingMode::eExclusive
         };
 
-        // create the vertexBuffer, however the memory hasn't been assigned yet for the vertexBuffer
+        // create the buffer, however the memory hasn't been assigned yet for the buffer
         if (device.createBuffer(&bufferCreateInfo, nullptr, &outBuffer) != vk::Result::eSuccess) {
-            throw std::runtime_error("Failed to create vertexBuffer");
+            throw std::runtime_error("Failed to create buffer");
         }
 
         vk::MemoryRequirements memoryRequirements = device.getBufferMemoryRequirements(outBuffer);
@@ -26,9 +26,9 @@ namespace Rehnda::BufferHelper {
         };
 
         if (device.allocateMemory(&memoryAllocateInfo, nullptr, &outBufferMemory) != vk::Result::eSuccess) {
-            throw std::runtime_error("Failed to allocate vertex vertexBuffer memory");
+            throw std::runtime_error("Failed to allocate vertex buffer memory");
         }
-        // associate the allocated memory with the previously created vertexBuffer
+        // associate the allocated memory with the previously created buffer
         device.bindBufferMemory(outBuffer, outBufferMemory, 0);
     }
 
@@ -42,6 +42,6 @@ namespace Rehnda::BufferHelper {
                 return i;
             }
         }
-        throw std::runtime_error("Failed to find suitable memory for a vertex vertexBuffer");
+        throw std::runtime_error("Failed to find suitable memory for a vertex buffer");
     }
 } // Rehnda

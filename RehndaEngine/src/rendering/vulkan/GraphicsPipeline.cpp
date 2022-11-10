@@ -8,9 +8,13 @@
 
 namespace Rehnda {
     const std::vector<Vertex> vertices = {
-            {{0.0f,  -0.5f}, {1.0f, 1.0f, 1.0f}},
-            {{0.5f,  0.5f},  {0.0f, 1.0f, 0.0f}},
-            {{-0.5f, 0.5f},  {0.0f, 0.0f, 1.0f}}
+            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+            {{0.5f,  -0.5f}, {0.0f, 1.0f, 0.0f}},
+            {{0.5f,  0.5f},  {0.0f, 0.0f, 1.0f}},
+            {{-0.5f, 0.5f},  {1.0f, 1.0f, 1.0f}}
+    };
+    const std::vector<uint16_t> indices = {
+            0, 1, 2, 2, 3, 0
     };
 
     /**
@@ -23,9 +27,19 @@ namespace Rehnda {
      * @param swapchainManager
      */
     GraphicsPipeline::GraphicsPipeline(vk::Device &device, vk::PhysicalDevice &physicalDevice,
-                                       vk::CommandPool &memoryCommandPool, vk::Queue& graphicsQueue, SwapchainManager *swapchainManager) :
+                                       vk::CommandPool &memoryCommandPool, vk::Queue &graphicsQueue,
+                                       SwapchainManager *swapchainManager) :
             device(device), swapchainManager(swapchainManager),
-            vertexBuffer(device, physicalDevice, memoryCommandPool, graphicsQueue, vertices) {
+            vertexBuffer(device, physicalDevice, memoryCommandPool, graphicsQueue, StagedBufferProps{
+                    .data = vertices.data(),
+                    .dataSize = sizeof(vertices[0]) * vertices.size(),
+                    .bufferUsageFlags = vk::BufferUsageFlagBits::eVertexBuffer
+            }),
+            indexBuffer(device, physicalDevice, memoryCommandPool, graphicsQueue, StagedBufferProps{
+                    .data = indices.data(),
+                    .dataSize = sizeof(indices[0]) * indices.size(),
+                    .bufferUsageFlags = vk::BufferUsageFlagBits::eIndexBuffer
+            }) {
         renderPass = createRenderPass();
         auto vertShaderCode = FileUtils::readFileAsBytes("shaders/triangle.vert.spv");
         auto fragShaderCode = FileUtils::readFileAsBytes("shaders/triangle.frag.spv");
@@ -163,6 +177,7 @@ namespace Rehnda {
 
     void GraphicsPipeline::destroy() {
         vertexBuffer.destroy();
+        indexBuffer.destroy();
         device.destroyPipeline(pipeline);
         device.destroyPipelineLayout(pipelineLayout);
         device.destroyRenderPass(renderPass);
@@ -218,7 +233,7 @@ namespace Rehnda {
 
     void GraphicsPipeline::recordCommandBuffer(vk::CommandBuffer &commandBuffer, uint32_t imageIndex) {
         vk::CommandBufferBeginInfo beginInfo{};
-        commandBuffer.begin(beginInfo); // this implicitly resets the vertexBuffer
+        commandBuffer.begin(beginInfo); // this implicitly resets the buffer
 
         vk::ClearValue clearColor{
                 .color = {
@@ -261,8 +276,10 @@ namespace Rehnda {
         vk::DeviceSize offsets[] = {0};
         commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
 
-        // vertex count, instance count, first vertex, first instance
-        commandBuffer.draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+        commandBuffer.bindIndexBuffer(indexBuffer.getBuffer(), 0, vk::IndexType::eUint16);
+
+        // indices count, instance count
+        commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
         commandBuffer.endRenderPass();
         commandBuffer.end();

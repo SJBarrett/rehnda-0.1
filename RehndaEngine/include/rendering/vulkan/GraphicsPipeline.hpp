@@ -9,7 +9,7 @@
 #include <vulkan/vulkan.hpp>
 #include "core/CoreTypes.hpp"
 #include "SwapchainManager.hpp"
-#include "VertexBuffer.hpp"
+#include "StagedBuffer.hpp"
 
 namespace Rehnda {
     class GraphicsPipeline {
@@ -31,7 +31,8 @@ namespace Rehnda {
         vk::Pipeline pipeline;
 
         // temp variables
-        VertexBuffer vertexBuffer;
+        StagedBuffer vertexBuffer;
+        StagedBuffer indexBuffer;
 
     private:
         vk::ShaderModule createShaderModule(const std::vector<char>& code);

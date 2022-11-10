@@ -40,7 +40,7 @@ namespace Rehnda {
 
     void FrameCoordinator::initCommandPool() {
         vk::CommandPoolCreateInfo poolCreateInfo{
-                // since we are recording a command vertexBuffer every frame we want to be able to reset and rerecord, hence ResetCommandBuffer
+                // since we are recording a command buffer every frame we want to be able to reset and rerecord, hence ResetCommandBuffer
                 .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
                 .queueFamilyIndex = queueFamilyIndices.graphicsQueueIndex.value(),
         };
@@ -48,7 +48,7 @@ namespace Rehnda {
 
         // separate command pool for memory oriented commands such as copying to GPU buffers as they are short lived
         vk::CommandPoolCreateInfo memoryCommandsPoolCreateInfo{
-                // since we are recording a command vertexBuffer every frame we want to be able to reset and rerecord, hence ResetCommandBuffer
+                // since we are recording a command buffer every frame we want to be able to reset and rerecord, hence ResetCommandBuffer
                 .flags = vk::CommandPoolCreateFlagBits::eTransient,
                 .queueFamilyIndex = queueFamilyIndices.graphicsQueueIndex.value(),
         };
@@ -88,7 +88,7 @@ namespace Rehnda {
      * 1. Wait for previous frame to finish
      * 2. Acquire an image from the swap chain
      * 3. Record a commabd bnuffer which draws the scene
-     * 4. Submit the recorded command vertexBuffer
+     * 4. Submit the recorded command buffer
      * 5. Present the swap chain image
      */
     DrawFrameResult FrameCoordinator::drawFrame() {

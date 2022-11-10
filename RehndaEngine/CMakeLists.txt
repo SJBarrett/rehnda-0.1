@@ -7,19 +7,19 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -std=c++20 -lws
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
 list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
 
-if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+if (NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
     message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
     file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/0.18.1/conan.cmake"
             "${CMAKE_BINARY_DIR}/conan.cmake"
             TLS_VERIFY ON)
-endif()
+endif ()
 include(${CMAKE_BINARY_DIR}/conan.cmake)
 
 # FIND VULKAN
 find_package(Vulkan REQUIRED)
 IF (NOT Vulkan_FOUND)
     message(FATAL_ERROR "Vulkan not found!")
-ENDIF()
+ENDIF ()
 message(STATUS "Vulkan lib path: " ${Vulkan_LIBRARY})
 message(STATUS "Vulkan include path: " ${Vulkan_INCLUDE_DIRS})
 
@@ -44,7 +44,7 @@ set(SOURCE_FILES
         src/rendering/vulkan/FrameCoordinator.cpp
         src/rendering/vulkan/SwapchainManager.cpp
         src/rendering/vulkan/GraphicsPipeline.cpp
-        src/rendering/vulkan/VertexBuffer.cpp
+        src/rendering/vulkan/StagedBuffer.cpp
         src/rendering/vulkan/VulkanRenderer.cpp
         src/core/FileUtils.cpp
         src/rendering/Vertex.cpp
@@ -72,16 +72,16 @@ add_custom_command(
 
 if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "AMD64")
     set(GLSL_VALIDATOR "$ENV{VULKAN_SDK}/Bin/glslangValidator.exe")
-else()
+else ()
     set(GLSL_VALIDATOR "$ENV{VULKAN_SDK}/Bin32/glslangValidator.exe")
-endif()
+endif ()
 
 file(GLOB_RECURSE GLSL_SOURCE_FILES
         "shaders/*.frag"
         "shaders/*.vert"
         )
 
-foreach(GLSL ${GLSL_SOURCE_FILES})
+foreach (GLSL ${GLSL_SOURCE_FILES})
     get_filename_component(FILE_NAME ${GLSL} NAME)
     set(SPIRV "${PROJECT_BINARY_DIR}/shaders/${FILE_NAME}.spv")
     add_custom_command(
@@ -90,7 +90,7 @@ foreach(GLSL ${GLSL_SOURCE_FILES})
             COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}
             DEPENDS ${GLSL})
     list(APPEND SPIRV_BINARY_FILES ${SPIRV})
-endforeach(GLSL)
+endforeach (GLSL)
 
 add_custom_target(
         Shaders

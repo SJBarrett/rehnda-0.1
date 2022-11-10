@@ -2,20 +2,18 @@
 // Created by sjbar on 10/11/2022.
 //
 
-#include "rendering/vulkan/VertexBuffer.hpp"
+#include "rendering/vulkan/StagedBuffer.hpp"
 #include "rendering/vulkan/BufferHelper.hpp"
 
 namespace Rehnda {
-    VertexBuffer::VertexBuffer(vk::Device &device, vk::PhysicalDevice &physicalDevice, vk::CommandPool &commandPool,
-                               vk::Queue &queue,
-                               const std::vector<Vertex> &vertices) : verticesSize(
-            sizeof(vertices[0]) * vertices.size()), device(device), physicalDevice(physicalDevice) {
-        // create the staging vertexBuffer which the host needs to be able to see (and coherent ensures the data is the same as what the CPU expects?)
+    StagedBuffer::StagedBuffer(vk::Device &device, vk::PhysicalDevice &physicalDevice, vk::CommandPool &commandPool,
+                               vk::Queue &queue, const StagedBufferProps& stagedBufferProps) : dataSize(stagedBufferProps.dataSize), device(device), physicalDevice(physicalDevice) {
+        // create the staging buffer which the host needs to be able to see (and coherent ensures the data is the same as what the CPU expects?)
         // and will be transferred from to the gpu later (hence transferSrc)
         vk::Buffer stagingBuffer;
         vk::DeviceMemory stagingBufferMemory;
         BufferHelper::CreateBufferAndAssignMemoryProps stagingBufferProps{
-                .size = verticesSize,
+                .size = dataSize,
                 .bufferUsage = vk::BufferUsageFlagBits::eTransferSrc,
                 .requiredMemoryProperties = vk::MemoryPropertyFlagBits::eHostVisible |
                                             vk::MemoryPropertyFlagBits::eHostCoherent
@@ -29,26 +27,26 @@ namespace Rehnda {
         );
 
 
-        // put the vertices into the staging vertexBuffer
-        void *data;
-        assert(device.mapMemory(stagingBufferMemory, 0, stagingBufferProps.size, vk::MemoryMapFlags{}, &data) ==
+        // put the data into the staging buffer
+        void *mappedMemory;
+        assert(device.mapMemory(stagingBufferMemory, 0, stagingBufferProps.size, vk::MemoryMapFlags{}, &mappedMemory) ==
                vk::Result::eSuccess);
-        memcpy(data, vertices.data(), (size_t) stagingBufferProps.size);
+        memcpy(mappedMemory, stagedBufferProps.data, (size_t) stagingBufferProps.size);
         device.unmapMemory(stagingBufferMemory);
 
-        // TODO allocating memory for every vertex buffer is not scalable as there is a max mem
+        // TODO allocating memory for every buffer is not scalable as there is a max mem
         //  allocation count which is relatively low (as low as 4096 on a 1080)
-        BufferHelper::CreateBufferAndAssignMemoryProps vertexBufferProps{
-                .size = sizeof(vertices[0]) * vertices.size(),
-                .bufferUsage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
+        BufferHelper::CreateBufferAndAssignMemoryProps bufferProps{
+                .size = dataSize,
+                .bufferUsage = stagedBufferProps.bufferUsageFlags | vk::BufferUsageFlagBits::eTransferDst,
                 .requiredMemoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal
         };
         BufferHelper::createBuffer(
                 device,
                 physicalDevice,
-                vertexBufferProps,
-                vertexBuffer,
-                vertexBufferMemory
+                bufferProps,
+                buffer,
+                bufferMemory
         );
 
         copyStagedBufferToGpu(stagingBuffer, commandPool, queue);
@@ -57,18 +55,18 @@ namespace Rehnda {
         device.freeMemory(stagingBufferMemory);
     }
 
-    void VertexBuffer::destroy() {
-        device.destroyBuffer(vertexBuffer);
-        device.freeMemory(vertexBufferMemory);
+    void StagedBuffer::destroy() {
+        device.destroyBuffer(buffer);
+        device.freeMemory(bufferMemory);
     }
 
 
-    vk::Buffer &VertexBuffer::getBuffer() {
-        return vertexBuffer;
+    vk::Buffer &StagedBuffer::getBuffer() {
+        return buffer;
     }
 
     void
-    VertexBuffer::copyStagedBufferToGpu(vk::Buffer &stagingBuffer, vk::CommandPool &commandPool, vk::Queue &queue) {
+    StagedBuffer::copyStagedBufferToGpu(vk::Buffer &stagingBuffer, vk::CommandPool &commandPool, vk::Queue &queue) {
         vk::CommandBufferAllocateInfo allocateInfo{
                 .commandPool = commandPool,
                 .level = vk::CommandBufferLevel::ePrimary,
@@ -86,10 +84,10 @@ namespace Rehnda {
                 vk::BufferCopy{
                         .srcOffset = 0,
                         .dstOffset = 0,
-                        .size = verticesSize
+                        .size = dataSize
                 }
         };
-        commandBuffer.copyBuffer(stagingBuffer, vertexBuffer, bufferCopy);
+        commandBuffer.copyBuffer(stagingBuffer, buffer, bufferCopy);
         commandBuffer.end();
 
         queue.submit({vk::SubmitInfo{
