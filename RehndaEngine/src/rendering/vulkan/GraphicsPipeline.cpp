@@ -162,7 +162,7 @@ namespace Rehnda {
     }
 
     void GraphicsPipeline::destroy() {
-        vertexBuffer.~VertexBuffer();
+        vertexBuffer.destroy();
         device.destroyPipeline(pipeline);
         device.destroyPipelineLayout(pipelineLayout);
         device.destroyRenderPass(renderPass);

@@ -14,7 +14,9 @@ namespace Rehnda {
     public:
         VertexBuffer(vk::Device& device, vk::PhysicalDevice& physicalDevice, vk::CommandPool& commandPool, vk::Queue& queue, const std::vector<Vertex>& vertices);
         VertexBuffer(const VertexBuffer&) = delete;
-        ~VertexBuffer();
+
+        // TODO Make RAII work so we don't have to manually call destroy methods
+        void destroy();
 
         vk::Buffer& getBuffer();
 

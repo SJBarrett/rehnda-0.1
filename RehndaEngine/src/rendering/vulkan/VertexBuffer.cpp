@@ -57,7 +57,7 @@ namespace Rehnda {
         device.freeMemory(stagingBufferMemory);
     }
 
-    VertexBuffer::~VertexBuffer() {
+    void VertexBuffer::destroy() {
         device.destroyBuffer(vertexBuffer);
         device.freeMemory(vertexBufferMemory);
     }
