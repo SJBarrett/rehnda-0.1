@@ -14,7 +14,7 @@
 namespace Rehnda {
     class GraphicsPipeline {
     public:
-        explicit GraphicsPipeline(vk::Device& device, vk::PhysicalDevice& physicalDevice, SwapchainManager* swapchainManager);
+        explicit GraphicsPipeline(vk::Device& device, vk::PhysicalDevice& physicalDevice, vk::CommandPool& memoryCommandPool, vk::Queue& graphicsQueue, SwapchainManager* swapchainManager);
         void destroy();
 
         void recordCommandBuffer(vk::CommandBuffer& commandBuffer, uint32_t imageIndex);

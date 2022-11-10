@@ -38,6 +38,7 @@ set(SOURCE_FILES
         src/main.cpp
         src/windowing/Window.cpp
         src/game/Application.cpp
+        src/rendering/vulkan/BufferHelper.cpp
         src/rendering/vulkan/VkInstanceHelpers.cpp
         src/rendering/vulkan/VkDebugHelpers.cpp
         src/rendering/vulkan/FrameCoordinator.cpp
@@ -46,7 +47,8 @@ set(SOURCE_FILES
         src/rendering/vulkan/VertexBuffer.cpp
         src/rendering/vulkan/VulkanRenderer.cpp
         src/core/FileUtils.cpp
-        src/rendering/Vertex.cpp)
+        src/rendering/Vertex.cpp
+        )
 
 add_executable(${ENGINE_TARGET_NAME} ${SOURCE_FILES})
 set_property(TARGET ${ENGINE_TARGET_NAME} PROPERTY CXX_STANDARD 20)

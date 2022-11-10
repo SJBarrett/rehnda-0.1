@@ -47,6 +47,7 @@ namespace Rehnda {
         vk::Queue graphicsQueue;
         vk::Queue presentQueue;
         vk::CommandPool graphicsCommandPool;
+        vk::CommandPool memoryCommandPool;
         std::vector<vk::CommandBuffer> commandBuffers;
 
         std::vector<vk::Semaphore> imageAvailableSemaphores;

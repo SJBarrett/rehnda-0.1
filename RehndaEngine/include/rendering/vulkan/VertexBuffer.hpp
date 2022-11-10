@@ -12,20 +12,21 @@
 namespace Rehnda {
     class VertexBuffer {
     public:
-        VertexBuffer(vk::Device& device, vk::PhysicalDevice& physicalDevice, const std::vector<Vertex>& vertices);
+        VertexBuffer(vk::Device& device, vk::PhysicalDevice& physicalDevice, vk::CommandPool& commandPool, vk::Queue& queue, const std::vector<Vertex>& vertices);
         VertexBuffer(const VertexBuffer&) = delete;
         ~VertexBuffer();
 
         vk::Buffer& getBuffer();
 
     private:
+        vk::DeviceSize verticesSize;
         vk::Device& device;
         vk::PhysicalDevice& physicalDevice;
 
-        vk::Buffer buffer;
-        vk::DeviceMemory bufferMemory;
+        vk::Buffer vertexBuffer;
+        vk::DeviceMemory vertexBufferMemory;
 
-        [[nodiscard]]
-        uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const;
+    private:
+        void copyStagedBufferToGpu(vk::Buffer& stagingBuffer, vk::CommandPool& commandPool, vk::Queue& queue);
     };
 }

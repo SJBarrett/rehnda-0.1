@@ -3,64 +3,102 @@
 //
 
 #include "rendering/vulkan/VertexBuffer.hpp"
+#include "rendering/vulkan/BufferHelper.hpp"
 
 namespace Rehnda {
-    VertexBuffer::VertexBuffer(vk::Device& device, vk::PhysicalDevice& physicalDevice, const std::vector<Vertex>& vertices) : device(device), physicalDevice(physicalDevice) {
-        vk::BufferCreateInfo bufferCreateInfo {
-            .size = sizeof(vertices[0]) * vertices.size(),
-            .usage = vk::BufferUsageFlagBits::eVertexBuffer,
-            // this buffer is only used by the graphics queue, so can be exclusive
-            .sharingMode = vk::SharingMode::eExclusive
+    VertexBuffer::VertexBuffer(vk::Device &device, vk::PhysicalDevice &physicalDevice, vk::CommandPool &commandPool,
+                               vk::Queue &queue,
+                               const std::vector<Vertex> &vertices) : verticesSize(
+            sizeof(vertices[0]) * vertices.size()), device(device), physicalDevice(physicalDevice) {
+        // create the staging vertexBuffer which the host needs to be able to see (and coherent ensures the data is the same as what the CPU expects?)
+        // and will be transferred from to the gpu later (hence transferSrc)
+        vk::Buffer stagingBuffer;
+        vk::DeviceMemory stagingBufferMemory;
+        BufferHelper::CreateBufferAndAssignMemoryProps stagingBufferProps{
+                .size = verticesSize,
+                .bufferUsage = vk::BufferUsageFlagBits::eTransferSrc,
+                .requiredMemoryProperties = vk::MemoryPropertyFlagBits::eHostVisible |
+                                            vk::MemoryPropertyFlagBits::eHostCoherent
         };
+        BufferHelper::createBuffer(
+                device,
+                physicalDevice,
+                stagingBufferProps,
+                stagingBuffer,
+                stagingBufferMemory
+        );
 
-        // create the buffer, however the memory hasn't been assigned yet for the buffer
-        if (device.createBuffer(&bufferCreateInfo, nullptr, &buffer) != vk::Result::eSuccess) {
-            throw std::runtime_error("Failed to create buffer");
-        }
 
-        vk::MemoryRequirements memoryRequirements = device.getBufferMemoryRequirements(buffer);
+        // put the vertices into the staging vertexBuffer
+        void *data;
+        assert(device.mapMemory(stagingBufferMemory, 0, stagingBufferProps.size, vk::MemoryMapFlags{}, &data) ==
+               vk::Result::eSuccess);
+        memcpy(data, vertices.data(), (size_t) stagingBufferProps.size);
+        device.unmapMemory(stagingBufferMemory);
 
-        // we need coherent memory to ensure the mapped memory always matches the contexts of the allocated memory
-        // spec guarantees the memory copy will be complete as of the next queueSubmit call
-        // alternative is to flush the memory https://www.khronos.org/registry/vulkan/specs/1.0/man/html/vkFlushMappedMemoryRanges.html
-        vk::MemoryPropertyFlags memoryRequiredProperties = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
-        vk::MemoryAllocateInfo memoryAllocateInfo {
-            .allocationSize = memoryRequirements.size,
-            .memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, memoryRequiredProperties)
+        // TODO allocating memory for every vertex buffer is not scalable as there is a max mem
+        //  allocation count which is relatively low (as low as 4096 on a 1080)
+        BufferHelper::CreateBufferAndAssignMemoryProps vertexBufferProps{
+                .size = sizeof(vertices[0]) * vertices.size(),
+                .bufferUsage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
+                .requiredMemoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal
         };
+        BufferHelper::createBuffer(
+                device,
+                physicalDevice,
+                vertexBufferProps,
+                vertexBuffer,
+                vertexBufferMemory
+        );
 
-        if (device.allocateMemory(&memoryAllocateInfo, nullptr, &bufferMemory) != vk::Result::eSuccess) {
-            throw std::runtime_error("Failed to allocate vertex buffer memory");
-        }
-        // associate the allocated memory with the previously created buffer
-        device.bindBufferMemory(buffer, bufferMemory, 0);
+        copyStagedBufferToGpu(stagingBuffer, commandPool, queue);
 
-        // put the vertices into the buffer by mapping the memory on the GPU to a memory address we can copy into, and then unmap
-        void* data;
-        assert(device.mapMemory(bufferMemory, 0, bufferCreateInfo.size, vk::MemoryMapFlags {}, &data) == vk::Result::eSuccess);
-        memcpy(data, vertices.data(), (size_t) bufferCreateInfo.size);
-        device.unmapMemory(bufferMemory);
+        device.destroyBuffer(stagingBuffer);
+        device.freeMemory(stagingBufferMemory);
     }
 
     VertexBuffer::~VertexBuffer() {
-        device.destroyBuffer(buffer);
-        device.freeMemory(bufferMemory);
+        device.destroyBuffer(vertexBuffer);
+        device.freeMemory(vertexBufferMemory);
     }
 
-    uint32_t VertexBuffer::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const {
-        vk::PhysicalDeviceMemoryProperties memoryProperties = physicalDevice.getMemoryProperties();
-
-        for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
-            bool isCorrectType = typeFilter & (1 << i);
-            bool hasSuitableProperties = (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties;
-            if (isCorrectType && hasSuitableProperties) {
-                return i;
-            }
-        }
-        throw std::runtime_error("Failed to find suitable memory for a vertex buffer");
-    }
 
     vk::Buffer &VertexBuffer::getBuffer() {
-        return buffer;
+        return vertexBuffer;
+    }
+
+    void
+    VertexBuffer::copyStagedBufferToGpu(vk::Buffer &stagingBuffer, vk::CommandPool &commandPool, vk::Queue &queue) {
+        vk::CommandBufferAllocateInfo allocateInfo{
+                .commandPool = commandPool,
+                .level = vk::CommandBufferLevel::ePrimary,
+                .commandBufferCount = 1
+        };
+
+        vk::CommandBuffer commandBuffer = device.allocateCommandBuffers(allocateInfo)[0];
+
+        vk::CommandBufferBeginInfo beginInfo{
+                .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
+        };
+        commandBuffer.begin(beginInfo);
+
+        std::array<vk::BufferCopy, 1> bufferCopy{
+                vk::BufferCopy{
+                        .srcOffset = 0,
+                        .dstOffset = 0,
+                        .size = verticesSize
+                }
+        };
+        commandBuffer.copyBuffer(stagingBuffer, vertexBuffer, bufferCopy);
+        commandBuffer.end();
+
+        queue.submit({vk::SubmitInfo{
+                .commandBufferCount = 1,
+                .pCommandBuffers = &commandBuffer
+        }});
+        // Instead of waiting on the queue to confirm the memory has been copied can use fences to queue multiple
+        // transfers at once and then wait for all of them
+        queue.waitIdle();
+        device.freeCommandBuffers(commandPool, {commandBuffer});
     }
 }

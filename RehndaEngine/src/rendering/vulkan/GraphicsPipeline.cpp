@@ -23,8 +23,9 @@ namespace Rehnda {
      * @param swapchainManager
      */
     GraphicsPipeline::GraphicsPipeline(vk::Device &device, vk::PhysicalDevice &physicalDevice,
-                                       SwapchainManager *swapchainManager) :
-            device(device), swapchainManager(swapchainManager), vertexBuffer(device, physicalDevice, vertices) {
+                                       vk::CommandPool &memoryCommandPool, vk::Queue& graphicsQueue, SwapchainManager *swapchainManager) :
+            device(device), swapchainManager(swapchainManager),
+            vertexBuffer(device, physicalDevice, memoryCommandPool, graphicsQueue, vertices) {
         renderPass = createRenderPass();
         auto vertShaderCode = FileUtils::readFileAsBytes("shaders/triangle.vert.spv");
         auto fragShaderCode = FileUtils::readFileAsBytes("shaders/triangle.frag.spv");
@@ -217,7 +218,7 @@ namespace Rehnda {
 
     void GraphicsPipeline::recordCommandBuffer(vk::CommandBuffer &commandBuffer, uint32_t imageIndex) {
         vk::CommandBufferBeginInfo beginInfo{};
-        commandBuffer.begin(beginInfo); // this implicitly resets the buffer
+        commandBuffer.begin(beginInfo); // this implicitly resets the vertexBuffer
 
         vk::ClearValue clearColor{
                 .color = {
