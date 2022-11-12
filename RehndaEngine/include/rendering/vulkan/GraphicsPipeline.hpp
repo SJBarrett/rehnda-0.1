@@ -10,6 +10,7 @@
 #include "core/CoreTypes.hpp"
 #include "SwapchainManager.hpp"
 #include "StagedBuffer.hpp"
+#include "rendering/RenderableMesh.hpp"
 
 namespace Rehnda {
     class GraphicsPipeline {
@@ -31,8 +32,7 @@ namespace Rehnda {
         vk::Pipeline pipeline;
 
         // temp variables
-        StagedBuffer vertexBuffer;
-        StagedBuffer indexBuffer;
+        RenderableMesh mesh;
 
     private:
         vk::ShaderModule createShaderModule(const std::vector<char>& code);

@@ -48,6 +48,7 @@ set(SOURCE_FILES
         src/rendering/vulkan/VulkanRenderer.cpp
         src/core/FileUtils.cpp
         src/rendering/Vertex.cpp
+        src/rendering/RenderableMesh.cpp
         )
 
 add_executable(${ENGINE_TARGET_NAME} ${SOURCE_FILES})

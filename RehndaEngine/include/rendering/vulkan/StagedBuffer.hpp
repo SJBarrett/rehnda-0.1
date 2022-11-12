@@ -23,7 +23,7 @@ namespace Rehnda {
         // TODO Make RAII work so we don't have to manually call destroy methods
         void destroy();
 
-        vk::Buffer& getBuffer();
+        const vk::Buffer& getBuffer() const;
 
     private:
         vk::DeviceSize dataSize;

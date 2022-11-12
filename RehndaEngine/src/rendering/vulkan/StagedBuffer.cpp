@@ -61,7 +61,7 @@ namespace Rehnda {
     }
 
 
-    vk::Buffer &StagedBuffer::getBuffer() {
+    const vk::Buffer &StagedBuffer::getBuffer() const {
         return buffer;
     }
 
