@@ -5,6 +5,7 @@
 #include "rendering/vulkan/GraphicsPipeline.hpp"
 #include "core/FileUtils.hpp"
 #include "rendering/Vertex.hpp"
+#include "rendering/MVPTransforms.hpp"
 
 namespace Rehnda {
     const std::vector<Vertex> vertices = {
@@ -27,7 +28,7 @@ namespace Rehnda {
      * @param swapchainManager
      */
     GraphicsPipeline::GraphicsPipeline(vk::Device &device, vk::PhysicalDevice &physicalDevice,
-                                       vk::CommandPool &memoryCommandPool, vk::Queue &graphicsQueue,
+                                       vk::CommandPool &memoryCommandPool, vk::Queue &graphicsQueue, vk::DescriptorSetLayout& descriptorSetLayout,
                                        SwapchainManager *swapchainManager) :
             device(device), swapchainManager(swapchainManager),
             mesh(DeviceContext{.device=device, .physicalDevice=physicalDevice, .memoryCommandPool=memoryCommandPool, .graphicsQueue=graphicsQueue},
@@ -96,7 +97,7 @@ namespace Rehnda {
                 .rasterizerDiscardEnable = VK_FALSE,
                 .polygonMode = vk::PolygonMode::eFill,
                 .cullMode = vk::CullModeFlagBits::eBack,
-                .frontFace = vk::FrontFace::eClockwise,
+                .frontFace = vk::FrontFace::eCounterClockwise,
                 .depthBiasEnable = VK_FALSE,
                 .lineWidth = 1.0f,
         };
@@ -120,8 +121,8 @@ namespace Rehnda {
         };
 
         vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{
-                .setLayoutCount = 0,
-                .pSetLayouts = nullptr,
+                .setLayoutCount = 1,
+                .pSetLayouts = &descriptorSetLayout,
                 .pushConstantRangeCount = 0,
                 .pPushConstantRanges = nullptr,
         };
@@ -152,7 +153,7 @@ namespace Rehnda {
 
         pipeline = device.createGraphicsPipeline(VK_NULL_HANDLE, graphicsPipelineCreateInfo).value;
 
-        // shader modules can be destroyed after the spir-v is compiled and linked to machine code during pipeline creation
+        // shader modules can be destroy ed after the spir-v is compiled and linked to machine code during pipeline creation
         device.destroyShaderModule(vertShaderModule);
         device.destroyShaderModule(fragShaderModule);
 
@@ -222,7 +223,7 @@ namespace Rehnda {
     }
 
 
-    void GraphicsPipeline::recordCommandBuffer(vk::CommandBuffer &commandBuffer, uint32_t imageIndex) {
+    void GraphicsPipeline::recordCommandBuffer(vk::CommandBuffer &commandBuffer, vk::DescriptorSet& currentDescriptorSet, uint32_t imageIndex) {
         vk::CommandBufferBeginInfo beginInfo{};
         commandBuffer.begin(beginInfo); // this implicitly resets the buffer
 
@@ -262,6 +263,7 @@ namespace Rehnda {
                 .extent = swapchainManager->getExtent(),
         };
         commandBuffer.setScissor(0, 1, &scissor);
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, {currentDescriptorSet}, nullptr);
 
         mesh.draw(commandBuffer);
 
@@ -272,4 +274,5 @@ namespace Rehnda {
     vk::RenderPass GraphicsPipeline::getRenderPass() const {
         return renderPass;
     }
+
 }

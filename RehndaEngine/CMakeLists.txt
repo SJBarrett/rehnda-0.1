@@ -45,6 +45,7 @@ set(SOURCE_FILES
         src/rendering/vulkan/SwapchainManager.cpp
         src/rendering/vulkan/GraphicsPipeline.cpp
         src/rendering/vulkan/StagedBuffer.cpp
+        src/rendering/vulkan/WritableDirectBuffer.cpp
         src/rendering/vulkan/VulkanRenderer.cpp
         src/core/FileUtils.cpp
         src/rendering/Vertex.cpp

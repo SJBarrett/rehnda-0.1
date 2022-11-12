@@ -4,17 +4,25 @@
 
 #include "rendering/vulkan/FrameCoordinator.hpp"
 
+#define GLM_FORCE_RADIANS
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <chrono>
 
 #include <memory>
 
 #include "rendering/vulkan/VkDebugHelpers.hpp"
 #include "rendering/vulkan/SwapchainManager.hpp"
+#include "rendering/MVPTransforms.hpp"
 
 namespace Rehnda {
 
     FrameCoordinator::FrameCoordinator(vk::Device &device, vk::PhysicalDevice &physicalDevice,
                                        NonOwner<SwapchainManager *> swapchainManager,
                                        QueueFamilyIndices queueFamilyIndices) : device(device),
+                                                                                physicalDevice(physicalDevice),
                                                                                 swapchainManager(swapchainManager),
                                                                                 queueFamilyIndices(queueFamilyIndices) {
         graphicsQueue = device.getQueue(queueFamilyIndices.graphicsQueueIndex.value(), 0);
@@ -22,11 +30,22 @@ namespace Rehnda {
 
         initCommandPool();
         createCommandBuffers();
-        graphicsPipeline = std::make_unique<GraphicsPipeline>(device, physicalDevice, memoryCommandPool, graphicsQueue, swapchainManager);
+        createDescriptorSetLayout();
+        createUbos();
+        createDescriptorPool();
+        createDescriptorSets();
+        graphicsPipeline = std::make_unique<GraphicsPipeline>(device, physicalDevice, memoryCommandPool, graphicsQueue,
+                                                              descriptorSetLayout,
+                                                              swapchainManager);
         createSyncObjects();
     }
 
     void FrameCoordinator::destroy() {
+        for (auto &buffer: uboBuffers) {
+            buffer.destroy();
+        }
+        device.destroyDescriptorPool(descriptorPool);
+        device.destroyDescriptorSetLayout(descriptorSetLayout);
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             device.destroySemaphore(imageAvailableSemaphores[i]);
             device.destroySemaphore(renderFinishedSemaphores[i]);
@@ -110,8 +129,10 @@ namespace Rehnda {
         // reset only once we have submitted work and know we won't exit early due to swapchain out of date
         device.resetFences({inFlightFences[currentFrame]});
 
+        updateUniformBuffer(currentFrame);
+
         commandBuffers[currentFrame].reset();
-        graphicsPipeline->recordCommandBuffer(commandBuffers[currentFrame], nextImageIndex);
+        graphicsPipeline->recordCommandBuffer(commandBuffers[currentFrame], descriptorSets[currentFrame], nextImageIndex);
 
         vk::Semaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
         std::vector<vk::Semaphore> signalSemaphores{renderFinishedSemaphores[currentFrame]};
@@ -138,6 +159,37 @@ namespace Rehnda {
         return DrawFrameResult::SUCCESS;
     }
 
+
+    void FrameCoordinator::createDescriptorSetLayout() {
+        vk::DescriptorSetLayoutBinding uboLayoutBinding{
+                .binding = 0,
+                .descriptorType = vk::DescriptorType::eUniformBuffer,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eVertex,
+                .pImmutableSamplers = nullptr
+        };
+
+        vk::DescriptorSetLayoutCreateInfo layoutCreateInfo{
+                .bindingCount = 1,
+                .pBindings = &uboLayoutBinding
+        };
+        descriptorSetLayout = device.createDescriptorSetLayout(layoutCreateInfo);
+    }
+
+    void FrameCoordinator::createUbos() {
+        vk::DeviceSize bufferSize = sizeof(MVPTransforms);
+        MVPTransforms defaultTransform;
+        const WritableDirectBufferProps bufferProps{
+                .dataSize = bufferSize,
+                .bufferUsageFlags = vk::BufferUsageFlagBits::eUniformBuffer,
+                .data = &defaultTransform
+        };
+        uboBuffers.reserve(MAX_FRAMES_IN_FLIGHT);
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            uboBuffers.emplace_back(device, physicalDevice, bufferProps);
+        }
+    }
+
     FrameCoordinator::~FrameCoordinator() {
         assert(destroyed);
     }
@@ -148,5 +200,63 @@ namespace Rehnda {
 
     void FrameCoordinator::setFramebufferResized() {
         framebufferResized = true;
+    }
+
+    void FrameCoordinator::updateUniformBuffer(uint32_t currentImage) {
+        static auto startTime = std::chrono::high_resolution_clock::now();
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        // TODO for frequently changing values such as the MVP transforms, push constants are more efficient than UBOs
+        MVPTransforms mvpTransforms{};
+        mvpTransforms.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.f), glm::vec3(0.0, 0.0, 1.0f));
+        mvpTransforms.view = glm::lookAt(glm::vec3(2.0, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f),
+                                         glm::vec3(0.0, 0.0f, 1.0f));
+        mvpTransforms.proj = glm::perspective(glm::radians(45.f), swapchainManager->getExtent().width /
+                                                                  (float) swapchainManager->getExtent().height, 0.1f,
+                                              10.f);
+        // negate the y scaling factor of the projection matrix as GLM was designed for OpenGL where the y clip co-ordinates are inverted
+        mvpTransforms.proj[1][1] *= -1;
+        uboBuffers[currentImage].writeData(&mvpTransforms);
+    }
+
+    void FrameCoordinator::createDescriptorPool() {
+        vk::DescriptorPoolSize poolSize{
+                .descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
+        };
+        vk::DescriptorPoolCreateInfo poolCreateInfo{
+                .maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
+                .poolSizeCount = 1,
+                .pPoolSizes = &poolSize
+        };
+        descriptorPool = device.createDescriptorPool(poolCreateInfo);
+    }
+
+    void FrameCoordinator::createDescriptorSets() {
+        std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+        vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo{
+                .descriptorPool = descriptorPool,
+                .descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
+                .pSetLayouts = layouts.data()
+        };
+        descriptorSets = device.allocateDescriptorSets(descriptorSetAllocateInfo);
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vk::DescriptorBufferInfo bufferInfo{
+                    .buffer = uboBuffers[i].getBuffer(),
+                    .offset = 0,
+                    .range = sizeof(MVPTransforms)
+            };
+            vk::WriteDescriptorSet descriptorWrite{
+                    .dstSet = descriptorSets[i],
+                    .dstBinding = 0,
+                    .dstArrayElement = 0,
+                    .descriptorCount = 1,
+                    .descriptorType = vk::DescriptorType::eUniformBuffer,
+                    .pImageInfo = nullptr,
+                    .pBufferInfo = &bufferInfo,
+                    .pTexelBufferView = nullptr
+            };
+            device.updateDescriptorSets({descriptorWrite}, nullptr);
+        }
     }
 }

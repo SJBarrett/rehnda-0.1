@@ -41,6 +41,7 @@ namespace Rehnda {
         bool framebufferResized = false;
 
         vk::Device& device;
+        vk::PhysicalDevice& physicalDevice;
         NonOwner<SwapchainManager *> swapchainManager;
         QueueFamilyIndices queueFamilyIndices;
 
@@ -54,6 +55,12 @@ namespace Rehnda {
         std::vector<vk::Semaphore> renderFinishedSemaphores;
         std::vector<vk::Fence> inFlightFences;
 
+        // UBOs
+        std::vector<WritableDirectBuffer> uboBuffers;
+        vk::DescriptorSetLayout descriptorSetLayout;
+        vk::DescriptorPool descriptorPool;
+        std::vector<vk::DescriptorSet> descriptorSets;
+
         std::unique_ptr<GraphicsPipeline> graphicsPipeline;
 
         bool destroyed = false;
@@ -63,5 +70,15 @@ namespace Rehnda {
         void createSyncObjects();
 
         void createCommandBuffers();
+
+        void createDescriptorSetLayout();
+
+        void createUbos();
+
+        void createDescriptorPool();
+
+        void createDescriptorSets();
+
+        void updateUniformBuffer(uint32_t currentImage);
     };
 }

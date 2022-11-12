@@ -11,14 +11,15 @@
 #include "SwapchainManager.hpp"
 #include "StagedBuffer.hpp"
 #include "rendering/RenderableMesh.hpp"
+#include "WritableDirectBuffer.hpp"
 
 namespace Rehnda {
     class GraphicsPipeline {
     public:
-        explicit GraphicsPipeline(vk::Device& device, vk::PhysicalDevice& physicalDevice, vk::CommandPool& memoryCommandPool, vk::Queue& graphicsQueue, SwapchainManager* swapchainManager);
+        explicit GraphicsPipeline(vk::Device& device, vk::PhysicalDevice& physicalDevice, vk::CommandPool& memoryCommandPool, vk::Queue& graphicsQueue, vk::DescriptorSetLayout& descriptorSetLayout, SwapchainManager* swapchainManager);
         void destroy();
 
-        void recordCommandBuffer(vk::CommandBuffer& commandBuffer, uint32_t imageIndex);
+        void recordCommandBuffer(vk::CommandBuffer& commandBuffer, vk::DescriptorSet& currentDescriptorSet, uint32_t imageIndex);
 
         [[nodiscard]]
         vk::RenderPass getRenderPass() const;
@@ -26,6 +27,7 @@ namespace Rehnda {
     private:
         vk::Device& device;
         NonOwner<SwapchainManager*> swapchainManager;
+
 
         vk::PipelineLayout pipelineLayout;
         vk::RenderPass renderPass;
@@ -38,6 +40,5 @@ namespace Rehnda {
         vk::ShaderModule createShaderModule(const std::vector<char>& code);
 
         vk::RenderPass createRenderPass();
-
     };
 }
