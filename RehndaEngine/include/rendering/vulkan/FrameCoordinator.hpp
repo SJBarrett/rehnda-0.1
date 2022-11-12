@@ -22,7 +22,7 @@ namespace Rehnda {
 
     class FrameCoordinator {
     public:
-        FrameCoordinator(vk::Device& device, vk::PhysicalDevice& physicalDevice, NonOwner<SwapchainManager *> swapchainManager,
+        FrameCoordinator(GLFWwindow* window, vk::Device& device, vk::PhysicalDevice& physicalDevice, vk::SurfaceKHR& surface,
                          QueueFamilyIndices queueFamilyIndices);
 
         ~FrameCoordinator();
@@ -30,8 +30,6 @@ namespace Rehnda {
         void destroy();
 
         DrawFrameResult drawFrame();
-
-        GraphicsPipeline& getGraphicsPipeline() const;
 
         void setFramebufferResized();
 
@@ -42,7 +40,7 @@ namespace Rehnda {
 
         vk::Device& device;
         vk::PhysicalDevice& physicalDevice;
-        NonOwner<SwapchainManager *> swapchainManager;
+        std::unique_ptr<SwapchainManager> swapchainManager;
         QueueFamilyIndices queueFamilyIndices;
 
         vk::Queue graphicsQueue;
@@ -62,6 +60,9 @@ namespace Rehnda {
         std::vector<vk::DescriptorSet> descriptorSets;
 
         std::unique_ptr<GraphicsPipeline> graphicsPipeline;
+
+        // temp
+        std::unique_ptr<RenderableMesh> mesh;
 
         bool destroyed = false;
     private:

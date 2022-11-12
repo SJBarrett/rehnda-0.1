@@ -30,7 +30,6 @@ namespace Rehnda {
         vk::SurfaceKHR surface;
         vk::PhysicalDevice physicalDevice;
         std::unique_ptr<FrameCoordinator> frameCoordinator;
-        std::unique_ptr<SwapchainManager> swapchainManager;
         vk::Device device;
         QueueFamilyIndices queueFamilyIndices;
 
@@ -45,12 +44,9 @@ namespace Rehnda {
 
         void createDevice();
 
-        void initSwapchain(GLFWwindow *window);
-
-
 
     private:
-        static int rateDeviceSuitability(const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr);
+        static int rateDeviceSuitability(GLFWwindow* window, const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr);
 
         static QueueFamilyIndices findQueueFamilies(const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr);
 

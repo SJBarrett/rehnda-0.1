@@ -18,12 +18,20 @@
 #include "rendering/MVPTransforms.hpp"
 
 namespace Rehnda {
+    const std::vector<Vertex> vertices = {
+            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+            {{0.5f,  -0.5f}, {0.0f, 1.0f, 0.0f}},
+            {{0.5f,  0.5f},  {0.0f, 0.0f, 1.0f}},
+            {{-0.5f, 0.5f},  {1.0f, 1.0f, 1.0f}}
+    };
+    const std::vector<uint16_t> indices = {
+            0, 1, 2, 2, 3, 0
+    };
 
-    FrameCoordinator::FrameCoordinator(vk::Device &device, vk::PhysicalDevice &physicalDevice,
-                                       NonOwner<SwapchainManager *> swapchainManager,
+    FrameCoordinator::FrameCoordinator(GLFWwindow* window, vk::Device &device, vk::PhysicalDevice &physicalDevice,
+                                       vk::SurfaceKHR& surface,
                                        QueueFamilyIndices queueFamilyIndices) : device(device),
                                                                                 physicalDevice(physicalDevice),
-                                                                                swapchainManager(swapchainManager),
                                                                                 queueFamilyIndices(queueFamilyIndices) {
         graphicsQueue = device.getQueue(queueFamilyIndices.graphicsQueueIndex.value(), 0);
         presentQueue = device.getQueue(queueFamilyIndices.presentQueueIndex.value(), 0);
@@ -34,9 +42,12 @@ namespace Rehnda {
         createUbos();
         createDescriptorPool();
         createDescriptorSets();
-        graphicsPipeline = std::make_unique<GraphicsPipeline>(device, physicalDevice, memoryCommandPool, graphicsQueue,
-                                                              descriptorSetLayout,
-                                                              swapchainManager);
+        mesh = std::make_unique<RenderableMesh>(
+                DeviceContext{.device = device, .physicalDevice=physicalDevice, .memoryCommandPool = memoryCommandPool, .graphicsQueue=graphicsQueue},
+                vertices, indices);
+        SwapChainSupportDetails swapChainSupportDetails(window, physicalDevice, surface);
+        graphicsPipeline = std::make_unique<GraphicsPipeline>(device, swapChainSupportDetails.chooseSwapSurfaceFormat().format, *mesh, descriptorSetLayout);
+        swapchainManager = std::make_unique<SwapchainManager>(device, surface, queueFamilyIndices, graphicsPipeline->getRenderPass(), swapChainSupportDetails);
         createSyncObjects();
     }
 
@@ -44,6 +55,7 @@ namespace Rehnda {
         for (auto &buffer: uboBuffers) {
             buffer.destroy();
         }
+        mesh->destroy();
         device.destroyDescriptorPool(descriptorPool);
         device.destroyDescriptorSetLayout(descriptorSetLayout);
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -52,6 +64,7 @@ namespace Rehnda {
             device.destroyFence(inFlightFences[i]);
         }
         graphicsPipeline->destroy();
+        swapchainManager->destroy();
         device.destroyCommandPool(graphicsCommandPool);
         device.destroyCommandPool(memoryCommandPool);
         destroyed = true;
@@ -119,6 +132,7 @@ namespace Rehnda {
                 imageAvailableSemaphores[currentFrame]);
         if (nextImageIndexResult.result == vk::Result::eErrorOutOfDateKHR || framebufferResized) {
             framebufferResized = false;
+            swapchainManager->resize(graphicsPipeline->getRenderPass());
             return DrawFrameResult::SWAPCHAIN_OUT_OF_DATE;
         } else if (nextImageIndexResult.result != vk::Result::eSuccess &&
                    nextImageIndexResult.result != vk::Result::eSuboptimalKHR) {
@@ -132,7 +146,7 @@ namespace Rehnda {
         updateUniformBuffer(currentFrame);
 
         commandBuffers[currentFrame].reset();
-        graphicsPipeline->recordCommandBuffer(commandBuffers[currentFrame], descriptorSets[currentFrame], nextImageIndex);
+        graphicsPipeline->recordCommandBuffer(commandBuffers[currentFrame], swapchainManager->getSwapchainFramebuffer(nextImageIndex), descriptorSets[currentFrame], swapchainManager->getExtent());
 
         vk::Semaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
         std::vector<vk::Semaphore> signalSemaphores{renderFinishedSemaphores[currentFrame]};
@@ -153,7 +167,7 @@ namespace Rehnda {
         if (swapchainManager->present(signalSemaphores, presentQueue, nextImageIndex) ==
             PresentResult::SWAPCHAIN_OUT_OF_DATE) {
             return DrawFrameResult::SWAPCHAIN_OUT_OF_DATE;
-        };
+        }
 
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
         return DrawFrameResult::SUCCESS;
@@ -178,7 +192,7 @@ namespace Rehnda {
 
     void FrameCoordinator::createUbos() {
         vk::DeviceSize bufferSize = sizeof(MVPTransforms);
-        MVPTransforms defaultTransform;
+        MVPTransforms defaultTransform{};
         const WritableDirectBufferProps bufferProps{
                 .dataSize = bufferSize,
                 .bufferUsageFlags = vk::BufferUsageFlagBits::eUniformBuffer,
@@ -192,10 +206,6 @@ namespace Rehnda {
 
     FrameCoordinator::~FrameCoordinator() {
         assert(destroyed);
-    }
-
-    GraphicsPipeline &FrameCoordinator::getGraphicsPipeline() const {
-        return *graphicsPipeline;
     }
 
     void FrameCoordinator::setFramebufferResized() {

@@ -4,27 +4,27 @@
 
 #include "rendering/vulkan/SwapchainManager.hpp"
 #include <limits>
-#include <spdlog/spdlog.h>
 
 namespace Rehnda {
-    SwapchainManager::SwapchainManager(GLFWwindow *window, const vk::PhysicalDevice &physicalDevice, vk::Device *device,
-                                       const vk::SurfaceKHR &surface, QueueFamilyIndices indices) : device(device) {
-        createSwapchain(window, physicalDevice, device, surface, indices);
+    SwapchainManager::SwapchainManager(vk::Device& device,
+                                       const vk::SurfaceKHR &surface, QueueFamilyIndices indices,
+                                       const vk::RenderPass &renderPass,
+                                       const SwapChainSupportDetails &swapChainSupportDetails) : device(device), surface(surface),
+                                                                                                 queueFamilyIndices(indices), swapChainSupportDetails(swapChainSupportDetails) {
+        createSwapchain();
         createImageViews();
+        initSwapchainBuffers(renderPass);
     }
 
-    void SwapchainManager::createSwapchain(GLFWwindow *window, const vk::PhysicalDevice &physicalDevice,
-                                           const vk::Device *device, const vk::SurfaceKHR &surface,
-                                           QueueFamilyIndices &indices) {
-        SwapChainSupportDetails swapChainSupportDetails = querySwapChainSupport(physicalDevice, surface);
-        const auto surfaceFormat = chooseSwapSurfaceFormat(swapChainSupportDetails.formats);
-        const auto presentMode = chooseSwapPresentMode(swapChainSupportDetails.presentModes);
-        const auto extent = chooseSwapExtent(window, swapChainSupportDetails.capabilities);
+    void SwapchainManager::createSwapchain() {
+        const auto surfaceFormat = swapChainSupportDetails.chooseSwapSurfaceFormat();
+        const auto presentMode = swapChainSupportDetails.chooseSwapPresentMode();
+        const auto extent = swapChainSupportDetails.chooseSwapExtent();
 
         swapchainImageFormat = surfaceFormat.format;
         swapchainExtent = extent;
 
-        // want one more than the minimum so we don't have to wait for the driver to complete operations
+        // want one more than the minimum, so we don't have to wait for the driver to complete operations
         uint32_t imageCount = swapChainSupportDetails.capabilities.minImageCount + 1;
         if (swapChainSupportDetails.capabilities.maxImageCount > 0 &&
             imageCount > swapChainSupportDetails.capabilities.maxImageCount) {
@@ -41,13 +41,13 @@ namespace Rehnda {
                 .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
         };
 
-        uint32_t queueFamilyIndices[] = {indices.graphicsQueueIndex.value(),
-                                         indices.presentQueueIndex.value()};
+        uint32_t indicesArray[] = {queueFamilyIndices.graphicsQueueIndex.value(),
+                                         queueFamilyIndices.presentQueueIndex.value()};
 
-        if (indices.graphicsQueueIndex.value() != indices.presentQueueIndex.value()) {
+        if (queueFamilyIndices.graphicsQueueIndex.value() != queueFamilyIndices.presentQueueIndex.value()) {
             createInfo.imageSharingMode = vk::SharingMode::eConcurrent;
             createInfo.queueFamilyIndexCount = 2;
-            createInfo.pQueueFamilyIndices = queueFamilyIndices;
+            createInfo.pQueueFamilyIndices = indicesArray;
         } else {
             createInfo.imageSharingMode = vk::SharingMode::eExclusive;
             createInfo.queueFamilyIndexCount = 0;
@@ -61,17 +61,16 @@ namespace Rehnda {
 
         createInfo.presentMode = presentMode;
         createInfo.clipped = VK_TRUE; // if our window is partially hidden, we don't care about rendering those hidden values
-// if the window is resized the swapchainManager needs to be re-created, and the previous swap chain referenced
+        // FIXME if the window is resized the swapchainManager needs to be re-created, and the previous swap chain referenced
         createInfo.oldSwapchain = VK_NULL_HANDLE;
-        swapchain = device->createSwapchainKHR(createInfo);
-        swapchainImages = device->getSwapchainImagesKHR(swapchain);
+        swapchain = device.createSwapchainKHR(createInfo);
+        swapchainImages = device.getSwapchainImagesKHR(swapchain);
     }
 
-    void SwapchainManager::resize(GLFWwindow *window, const vk::PhysicalDevice &physicalDevice,
-                                  const vk::SurfaceKHR &surface, QueueFamilyIndices indices, const vk::RenderPass &renderPass) {
-        device->waitIdle();
+    void SwapchainManager::resize(const vk::RenderPass &renderPass) {
+        device.waitIdle();
         cleanupResources();
-        createSwapchain(window, physicalDevice, device, surface, indices);
+        createSwapchain();
         createImageViews();
         initSwapchainBuffers(renderPass);
     }
@@ -98,70 +97,18 @@ namespace Rehnda {
                             .layerCount = 1,
                     },
             };
-            swapchainImageViews[i] = device->createImageView(imageViewCreateInfo);
-        }
-    }
-
-    SwapChainSupportDetails
-    SwapchainManager::querySwapChainSupport(const vk::PhysicalDevice &physicalDevice, const vk::SurfaceKHR &surface) {
-        return {
-                .capabilities = physicalDevice.getSurfaceCapabilitiesKHR(surface),
-                .formats = physicalDevice.getSurfaceFormatsKHR(surface),
-                .presentModes = physicalDevice.getSurfacePresentModesKHR(surface),
-        };
-    }
-
-    vk::SurfaceFormatKHR
-    SwapchainManager::chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats) {
-        for (const auto &availableFormat: availableFormats) {
-            if (availableFormat.format == vk::Format::eB8G8R8A8Srgb &&
-                availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
-                return availableFormat;
-            }
-        }
-        return availableFormats[0];
-    }
-
-    vk::PresentModeKHR
-    SwapchainManager::chooseSwapPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes) {
-        for (const auto &availablePresentMode: availablePresentModes) {
-            if (availablePresentMode == vk::PresentModeKHR::eMailbox) {
-                return availablePresentMode;
-            }
-        }
-        return vk::PresentModeKHR::eFifo;
-    }
-
-    vk::Extent2D
-    SwapchainManager::chooseSwapExtent(GLFWwindow *window, const vk::SurfaceCapabilitiesKHR &capabilities) {
-        if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
-            return capabilities.currentExtent;
-        } else {
-            int width, height;
-            glfwGetFramebufferSize(window, &width, &height);
-
-            vk::Extent2D actualExtent = {
-                    static_cast<uint32_t>(width),
-                    static_cast<uint32_t>(height)
-            };
-
-            actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width,
-                                            capabilities.maxImageExtent.width);
-            actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height,
-                                             capabilities.maxImageExtent.height);
-
-            return actualExtent;
+            swapchainImageViews[i] = device.createImageView(imageViewCreateInfo);
         }
     }
 
     void SwapchainManager::cleanupResources() {
         // TODO: To support moving between SDR and HDR monitors the renderpass would need to be recreated too
         for (auto framebuffer: swapchainFramebuffers) {
-            device->destroyFramebuffer(framebuffer);
+            device.destroyFramebuffer(framebuffer);
         }
-        device->destroySwapchainKHR(swapchain);
+        device.destroySwapchainKHR(swapchain);
         for (auto &swapchainImageView: swapchainImageViews) {
-            device->destroyImageView(swapchainImageView);
+            device.destroyImageView(swapchainImageView);
         }
     }
 
@@ -172,10 +119,6 @@ namespace Rehnda {
 
     vk::Extent2D SwapchainManager::getExtent() const {
         return swapchainExtent;
-    }
-
-    vk::Format SwapchainManager::getImageFormat() const {
-        return swapchainImageFormat;
     }
 
     void SwapchainManager::initSwapchainBuffers(const vk::RenderPass &renderPass) {
@@ -195,20 +138,20 @@ namespace Rehnda {
                     .layers = 1,
             };
 
-            swapchainFramebuffers[i] = device->createFramebuffer(framebufferCreateInfo);
+            swapchainFramebuffers[i] = device.createFramebuffer(framebufferCreateInfo);
         }
     }
 
-    vk::Framebuffer SwapchainManager::getSwapchainFramebuffer(size_t bufferIndex) const {
+    vk::Framebuffer& SwapchainManager::getSwapchainFramebuffer(size_t bufferIndex) {
         return swapchainFramebuffers[bufferIndex];
     }
 
     vk::ResultValue<uint32_t> SwapchainManager::acquireNextImageIndex(vk::Semaphore &imageAvailableSemaphore) {
-        return device->acquireNextImageKHR(swapchain, UINT64_MAX, imageAvailableSemaphore);
+        return device.acquireNextImageKHR(swapchain, UINT64_MAX, imageAvailableSemaphore);
     }
 
     PresentResult SwapchainManager::present(const std::vector<vk::Semaphore> &waitSemaphores, vk::Queue &presentQueue,
-                                   uint32_t imageIndex) {
+                                            uint32_t imageIndex) {
         vk::SwapchainKHR swapChains[] = {swapchain};
         vk::PresentInfoKHR presentInfoKhr{
                 .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
@@ -227,5 +170,54 @@ namespace Rehnda {
 
     SwapchainManager::~SwapchainManager() {
         assert(destroyed);
+    }
+
+    SwapChainSupportDetails::SwapChainSupportDetails(GLFWwindow *window,
+                                                     const vk::PhysicalDevice &physicalDevice,
+                                                     const vk::SurfaceKHR &surface) :
+            capabilities(physicalDevice.getSurfaceCapabilitiesKHR(surface)),
+            window(window),
+            formats(physicalDevice.getSurfaceFormatsKHR(surface)),
+            presentModes(physicalDevice.getSurfacePresentModesKHR(surface)) {
+    }
+
+    vk::SurfaceFormatKHR SwapChainSupportDetails::chooseSwapSurfaceFormat() const {
+        for (const auto &availableFormat: formats) {
+            if (availableFormat.format == vk::Format::eB8G8R8A8Srgb &&
+                availableFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
+                return availableFormat;
+            }
+        }
+        return formats[0];
+    }
+
+    vk::PresentModeKHR SwapChainSupportDetails::chooseSwapPresentMode() const {
+        for (const auto &availablePresentMode: presentModes) {
+            if (availablePresentMode == vk::PresentModeKHR::eMailbox) {
+                return availablePresentMode;
+            }
+        }
+        return vk::PresentModeKHR::eFifo;
+    }
+
+    vk::Extent2D SwapChainSupportDetails::chooseSwapExtent() const {
+        if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+            return capabilities.currentExtent;
+        } else {
+            int width, height;
+            glfwGetFramebufferSize(window, &width, &height);
+
+            vk::Extent2D actualExtent = {
+                    static_cast<uint32_t>(width),
+                    static_cast<uint32_t>(height)
+            };
+
+            actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width,
+                                            capabilities.maxImageExtent.width);
+            actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height,
+                                             capabilities.maxImageExtent.height);
+
+            return actualExtent;
+        }
     }
 }

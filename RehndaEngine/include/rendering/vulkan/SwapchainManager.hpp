@@ -13,10 +13,21 @@
 
 
 namespace Rehnda {
-    struct SwapChainSupportDetails {
-        vk::SurfaceCapabilitiesKHR capabilities;
-        std::vector<vk::SurfaceFormatKHR> formats;
-        std::vector<vk::PresentModeKHR> presentModes;
+    class SwapChainSupportDetails {
+    public:
+        SwapChainSupportDetails(GLFWwindow* window, const vk::PhysicalDevice &physicalDevice, const vk::SurfaceKHR &surface);
+        [[nodiscard]]
+        vk::SurfaceFormatKHR chooseSwapSurfaceFormat() const;
+        [[nodiscard]]
+        vk::PresentModeKHR chooseSwapPresentMode() const;
+        [[nodiscard]]
+        vk::Extent2D chooseSwapExtent() const;
+
+        const vk::SurfaceCapabilitiesKHR capabilities;
+        const std::vector<vk::SurfaceFormatKHR> formats;
+        const std::vector<vk::PresentModeKHR> presentModes;
+    private:
+        NonOwner<GLFWwindow*> window;
     };
 
     enum class PresentResult {
@@ -26,14 +37,13 @@ namespace Rehnda {
 
     class SwapchainManager {
     public:
-        SwapchainManager(GLFWwindow *window, const vk::PhysicalDevice &physicalDevice, vk::Device *device,
-                         const vk::SurfaceKHR &surface, QueueFamilyIndices queueFamilyIndices);
+        SwapchainManager(vk::Device& device,
+                         const vk::SurfaceKHR &surface, QueueFamilyIndices , const vk::RenderPass& renderPass, const SwapChainSupportDetails &swapChainSupportDetails);
 
         ~SwapchainManager();
 
-        void resize(GLFWwindow *window, const vk::PhysicalDevice &physicalDevice, const vk::SurfaceKHR &surface, QueueFamilyIndices indices, const vk::RenderPass &renderPass);
+        void resize(const vk::RenderPass &renderPass);
 
-        void initSwapchainBuffers(const vk::RenderPass &renderPass);
 
         void destroy();
 
@@ -41,19 +51,20 @@ namespace Rehnda {
 
         PresentResult present(const std::vector<vk::Semaphore> &waitSemaphores, vk::Queue &presentQueue, uint32_t imageIndex);
 
+        [[nodiscard]]
         vk::Extent2D getExtent() const;
 
-        vk::Format getImageFormat() const;
-
         [[nodiscard]]
-        vk::Framebuffer getSwapchainFramebuffer(size_t bufferIndex) const;
-
-        static SwapChainSupportDetails
-        querySwapChainSupport(const vk::PhysicalDevice &physicalDevice, const vk::SurfaceKHR &surface);
+        vk::Framebuffer& getSwapchainFramebuffer(size_t bufferIndex);
 
 
     private:
         bool destroyed = false;
+
+        vk::Device& device;
+        const vk::SurfaceKHR& surface;
+        const QueueFamilyIndices queueFamilyIndices;
+        const SwapChainSupportDetails& swapChainSupportDetails;
 
         vk::SwapchainKHR swapchain;
         vk::Format swapchainImageFormat;
@@ -62,20 +73,13 @@ namespace Rehnda {
         std::vector<vk::ImageView> swapchainImageViews;
         std::vector<vk::Framebuffer> swapchainFramebuffers;
 
-        NonOwner<vk::Device *> device;
 
     private:
         void cleanupResources();
 
         void createImageViews();
 
-        vk::SurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<vk::SurfaceFormatKHR> &availableFormats);
-
-        vk::PresentModeKHR chooseSwapPresentMode(const std::vector<vk::PresentModeKHR> &availablePresentModes);
-
-        vk::Extent2D chooseSwapExtent(GLFWwindow *window, const vk::SurfaceCapabilitiesKHR &capabilities);
-
-        void createSwapchain(GLFWwindow *window, const vk::PhysicalDevice &physicalDevice, const vk::Device *device,
-                             const vk::SurfaceKHR &surface, QueueFamilyIndices &indices);
+        void createSwapchain();
+        void initSwapchainBuffers(const vk::RenderPass &renderPass);
     };
 }

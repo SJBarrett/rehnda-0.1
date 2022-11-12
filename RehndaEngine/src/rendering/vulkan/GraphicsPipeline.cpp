@@ -5,18 +5,9 @@
 #include "rendering/vulkan/GraphicsPipeline.hpp"
 #include "core/FileUtils.hpp"
 #include "rendering/Vertex.hpp"
-#include "rendering/MVPTransforms.hpp"
 
 namespace Rehnda {
-    const std::vector<Vertex> vertices = {
-            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-            {{0.5f,  -0.5f}, {0.0f, 1.0f, 0.0f}},
-            {{0.5f,  0.5f},  {0.0f, 0.0f, 1.0f}},
-            {{-0.5f, 0.5f},  {1.0f, 1.0f, 1.0f}}
-    };
-    const std::vector<uint16_t> indices = {
-            0, 1, 2, 2, 3, 0
-    };
+
 
     /**
      * Summary of what's going on:
@@ -27,13 +18,9 @@ namespace Rehnda {
      * @param device
      * @param swapchainManager
      */
-    GraphicsPipeline::GraphicsPipeline(vk::Device &device, vk::PhysicalDevice &physicalDevice,
-                                       vk::CommandPool &memoryCommandPool, vk::Queue &graphicsQueue, vk::DescriptorSetLayout& descriptorSetLayout,
-                                       SwapchainManager *swapchainManager) :
-            device(device), swapchainManager(swapchainManager),
-            mesh(DeviceContext{.device=device, .physicalDevice=physicalDevice, .memoryCommandPool=memoryCommandPool, .graphicsQueue=graphicsQueue},
-                 vertices, indices) {
-        renderPass = createRenderPass();
+    GraphicsPipeline::GraphicsPipeline(vk::Device &device, vk::Format imageFormat, RenderableMesh& renderableMesh, vk::DescriptorSetLayout& descriptorSetLayout) :
+            device(device), mesh(renderableMesh) {
+        renderPass = createRenderPass(imageFormat);
         auto vertShaderCode = FileUtils::readFileAsBytes("shaders/triangle.vert.spv");
         auto fragShaderCode = FileUtils::readFileAsBytes("shaders/triangle.frag.spv");
 
@@ -156,8 +143,6 @@ namespace Rehnda {
         // shader modules can be destroy ed after the spir-v is compiled and linked to machine code during pipeline creation
         device.destroyShaderModule(vertShaderModule);
         device.destroyShaderModule(fragShaderModule);
-
-        swapchainManager->initSwapchainBuffers(renderPass);
     }
 
     vk::ShaderModule GraphicsPipeline::createShaderModule(const std::vector<char> &code) {
@@ -169,15 +154,14 @@ namespace Rehnda {
     }
 
     void GraphicsPipeline::destroy() {
-        mesh.destroy();
         device.destroyPipeline(pipeline);
         device.destroyPipelineLayout(pipelineLayout);
         device.destroyRenderPass(renderPass);
     }
 
-    vk::RenderPass GraphicsPipeline::createRenderPass() {
+    vk::RenderPass GraphicsPipeline::createRenderPass(vk::Format imageFormat) {
         vk::AttachmentDescription colorAttachment{
-                .format = swapchainManager->getImageFormat(),
+                .format = imageFormat,
                 .samples = vk::SampleCountFlagBits::e1,
                 .loadOp = vk::AttachmentLoadOp::eClear,
                 .storeOp = vk::AttachmentStoreOp::eStore,
@@ -223,7 +207,7 @@ namespace Rehnda {
     }
 
 
-    void GraphicsPipeline::recordCommandBuffer(vk::CommandBuffer &commandBuffer, vk::DescriptorSet& currentDescriptorSet, uint32_t imageIndex) {
+    void GraphicsPipeline::recordCommandBuffer(vk::CommandBuffer &commandBuffer, vk::Framebuffer& targetFramebuffer, vk::DescriptorSet& currentDescriptorSet, vk::Extent2D extent) {
         vk::CommandBufferBeginInfo beginInfo{};
         commandBuffer.begin(beginInfo); // this implicitly resets the buffer
 
@@ -235,10 +219,10 @@ namespace Rehnda {
 
         vk::RenderPassBeginInfo renderPassBeginInfo{
                 .renderPass = renderPass,
-                .framebuffer = swapchainManager->getSwapchainFramebuffer(imageIndex),
+                .framebuffer = targetFramebuffer,
                 .renderArea = {
                         .offset = {0, 0},
-                        .extent = swapchainManager->getExtent(),
+                        .extent = extent,
                 },
                 .clearValueCount = 1,
                 .pClearValues = &clearColor,
@@ -251,8 +235,8 @@ namespace Rehnda {
         vk::Viewport viewport{
                 .x = 0.0f,
                 .y = 0.0f,
-                .width = static_cast<float>(swapchainManager->getExtent().width),
-                .height = static_cast<float>(swapchainManager->getExtent().height),
+                .width = static_cast<float>(extent.width),
+                .height = static_cast<float>(extent.height),
                 .minDepth = 0.0f,
                 .maxDepth = 1.0f,
         };
@@ -260,7 +244,7 @@ namespace Rehnda {
 
         vk::Rect2D scissor{
                 .offset = {0, 0},
-                .extent = swapchainManager->getExtent(),
+                .extent = extent,
         };
         commandBuffer.setScissor(0, 1, &scissor);
         commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, {currentDescriptorSet}, nullptr);

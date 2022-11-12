@@ -36,15 +36,13 @@ namespace Rehnda {
         physicalDevice = pickPhysicalDevice();
 
         createDevice();
-        initSwapchain(window);
-        frameCoordinator = std::make_unique<FrameCoordinator>(device, physicalDevice, swapchainManager.get(), queueFamilyIndices);
+        frameCoordinator = std::make_unique<FrameCoordinator>(window, device, physicalDevice, surface, queueFamilyIndices);
     }
 
     VulkanRenderer::~VulkanRenderer() {
         if (enableValidationLayers) {
             VkDebugHelpers::destroy_debug_messenger(instance, debugMessenger);
         }
-        swapchainManager->destroy();
         frameCoordinator->destroy();
         device.destroy();
         instance.destroySurfaceKHR(surface);
@@ -60,7 +58,7 @@ namespace Rehnda {
         std::multimap<int, vk::PhysicalDevice> candidates;
 
         for (const auto &device: physicalDevices) {
-            int score = rateDeviceSuitability(device, surface);
+            int score = rateDeviceSuitability(window, device, surface);
             candidates.insert(std::make_pair(score, device));
         }
 
@@ -72,7 +70,7 @@ namespace Rehnda {
         }
     }
 
-    int VulkanRenderer::rateDeviceSuitability(const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr) {
+    int VulkanRenderer::rateDeviceSuitability(GLFWwindow* window, const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr) {
         const auto deviceProperties = device.getProperties();
         const auto deviceFeatures = device.getFeatures();
         int score = 1;
@@ -99,8 +97,7 @@ namespace Rehnda {
         if (!areRequiredExtensionsSupported(device, requiredDeviceExtensions)) {
             return 0;
         }
-
-        const auto swapChainSupportDetails = SwapchainManager::querySwapChainSupport(device, surfaceKhr);
+        SwapChainSupportDetails swapChainSupportDetails{window, device, surfaceKhr};
         if (swapChainSupportDetails.formats.empty() || swapChainSupportDetails.presentModes.empty()) {
             return 0;
         }
@@ -144,10 +141,6 @@ namespace Rehnda {
         return requiredExtensionsSet.empty();
     }
 
-    void VulkanRenderer::initSwapchain(GLFWwindow *window) {
-        swapchainManager = std::make_unique<SwapchainManager>(window, physicalDevice, &device, surface, queueFamilyIndices);
-    }
-
     void VulkanRenderer::createDevice() {
         queueFamilyIndices = findQueueFamilies(physicalDevice, surface);
 
@@ -185,15 +178,7 @@ namespace Rehnda {
     }
 
     void VulkanRenderer::drawFrame() {
-
-        switch (frameCoordinator->drawFrame()) {
-            case DrawFrameResult::SWAPCHAIN_OUT_OF_DATE:
-                swapchainManager->resize(window, physicalDevice, surface, queueFamilyIndices, frameCoordinator->getGraphicsPipeline().getRenderPass());
-                break;
-            case DrawFrameResult::SUCCESS:
-            default:
-                break;
-        };
+        frameCoordinator->drawFrame();
     }
 
     void VulkanRenderer::resize() {
