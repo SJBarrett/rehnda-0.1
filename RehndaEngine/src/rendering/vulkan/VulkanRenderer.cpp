@@ -36,14 +36,15 @@ namespace Rehnda {
         physicalDevice = pickPhysicalDevice();
 
         createDevice();
-        frameCoordinator = std::make_unique<FrameCoordinator>(window, device, physicalDevice, surface, queueFamilyIndices);
+        frameCoordinator = std::make_unique<FrameCoordinator>(window, device, physicalDevice, surface,
+                                                              queueFamilyIndices);
     }
 
     VulkanRenderer::~VulkanRenderer() {
         if (enableValidationLayers) {
             VkDebugHelpers::destroy_debug_messenger(instance, debugMessenger);
         }
-        frameCoordinator->destroy();
+        frameCoordinator.reset();
         device.destroy();
         instance.destroySurfaceKHR(surface);
         instance.destroy();
@@ -70,7 +71,8 @@ namespace Rehnda {
         }
     }
 
-    int VulkanRenderer::rateDeviceSuitability(GLFWwindow* window, const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr) {
+    int VulkanRenderer::rateDeviceSuitability(GLFWwindow *window, const vk::PhysicalDevice &device,
+                                              const vk::SurfaceKHR &surfaceKhr) {
         const auto deviceProperties = device.getProperties();
         const auto deviceFeatures = device.getFeatures();
         int score = 1;
@@ -130,7 +132,8 @@ namespace Rehnda {
         return indices;
     }
 
-    bool VulkanRenderer::areRequiredExtensionsSupported(const vk::PhysicalDevice &device, const std::vector<const char *>& requiredExtensions) {
+    bool VulkanRenderer::areRequiredExtensionsSupported(const vk::PhysicalDevice &device,
+                                                        const std::vector<const char *> &requiredExtensions) {
         const auto availableExtensions = device.enumerateDeviceExtensionProperties();
         std::set<std::string> requiredExtensionsSet(requiredExtensions.begin(), requiredExtensions.end());
 

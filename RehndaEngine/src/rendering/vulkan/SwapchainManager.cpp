@@ -6,11 +6,15 @@
 #include <limits>
 
 namespace Rehnda {
-    SwapchainManager::SwapchainManager(vk::Device& device,
+    SwapchainManager::SwapchainManager(vk::Device &device,
                                        const vk::SurfaceKHR &surface, QueueFamilyIndices indices,
                                        const vk::RenderPass &renderPass,
-                                       const SwapChainSupportDetails &swapChainSupportDetails) : device(device), surface(surface),
-                                                                                                 queueFamilyIndices(indices), swapChainSupportDetails(swapChainSupportDetails) {
+                                       const SwapChainSupportDetails &swapChainSupportDetails) : device(device),
+                                                                                                 surface(surface),
+                                                                                                 queueFamilyIndices(
+                                                                                                         indices),
+                                                                                                 swapChainSupportDetails(
+                                                                                                         swapChainSupportDetails) {
         createSwapchain();
         createImageViews();
         initSwapchainBuffers(renderPass);
@@ -42,7 +46,7 @@ namespace Rehnda {
         };
 
         uint32_t indicesArray[] = {queueFamilyIndices.graphicsQueueIndex.value(),
-                                         queueFamilyIndices.presentQueueIndex.value()};
+                                   queueFamilyIndices.presentQueueIndex.value()};
 
         if (queueFamilyIndices.graphicsQueueIndex.value() != queueFamilyIndices.presentQueueIndex.value()) {
             createInfo.imageSharingMode = vk::SharingMode::eConcurrent;
@@ -142,7 +146,7 @@ namespace Rehnda {
         }
     }
 
-    vk::Framebuffer& SwapchainManager::getSwapchainFramebuffer(size_t bufferIndex) {
+    vk::Framebuffer &SwapchainManager::getSwapchainFramebuffer(size_t bufferIndex) {
         return swapchainFramebuffers[bufferIndex];
     }
 
@@ -169,7 +173,7 @@ namespace Rehnda {
     }
 
     SwapchainManager::~SwapchainManager() {
-        assert(destroyed);
+        destroy();
     }
 
     SwapChainSupportDetails::SwapChainSupportDetails(GLFWwindow *window,

@@ -39,4 +39,9 @@ namespace Rehnda {
         vertexBuffer.destroy();
         indexBuffer.destroy();
     }
+
+    RenderableMesh::~RenderableMesh() {
+        vertexBuffer.destroy();
+        indexBuffer.destroy();
+    }
 }

@@ -18,7 +18,8 @@ namespace Rehnda {
      * @param device
      * @param swapchainManager
      */
-    GraphicsPipeline::GraphicsPipeline(vk::Device &device, vk::Format imageFormat, RenderableMesh& renderableMesh, vk::DescriptorSetLayout& descriptorSetLayout) :
+    GraphicsPipeline::GraphicsPipeline(vk::Device &device, vk::Format imageFormat, RenderableMesh &renderableMesh,
+                                       vk::DescriptorSetLayout &descriptorSetLayout) :
             device(device), mesh(renderableMesh) {
         renderPass = createRenderPass(imageFormat);
         auto vertShaderCode = FileUtils::readFileAsBytes("shaders/triangle.vert.spv");
@@ -207,7 +208,8 @@ namespace Rehnda {
     }
 
 
-    void GraphicsPipeline::recordCommandBuffer(vk::CommandBuffer &commandBuffer, vk::Framebuffer& targetFramebuffer, vk::DescriptorSet& currentDescriptorSet, vk::Extent2D extent) {
+    void GraphicsPipeline::recordCommandBuffer(vk::CommandBuffer &commandBuffer, vk::Framebuffer &targetFramebuffer,
+                                               vk::DescriptorSet &currentDescriptorSet, vk::Extent2D extent) {
         vk::CommandBufferBeginInfo beginInfo{};
         commandBuffer.begin(beginInfo); // this implicitly resets the buffer
 
@@ -247,7 +249,8 @@ namespace Rehnda {
                 .extent = extent,
         };
         commandBuffer.setScissor(0, 1, &scissor);
-        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, {currentDescriptorSet}, nullptr);
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, {currentDescriptorSet},
+                                         nullptr);
 
         mesh.draw(commandBuffer);
 
@@ -257,6 +260,10 @@ namespace Rehnda {
 
     vk::RenderPass GraphicsPipeline::getRenderPass() const {
         return renderPass;
+    }
+
+    GraphicsPipeline::~GraphicsPipeline() {
+        destroy();
     }
 
 }

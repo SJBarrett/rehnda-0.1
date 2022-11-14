@@ -13,26 +13,30 @@ namespace Rehnda {
     struct WritableDirectBufferProps {
         vk::DeviceSize dataSize;
         vk::BufferUsageFlags bufferUsageFlags;
-        const void* data = nullptr;
+        const void *data = nullptr;
     };
+
     class WritableDirectBuffer {
     public:
-        WritableDirectBuffer(vk::Device& device, vk::PhysicalDevice& physicalDevice, const WritableDirectBufferProps& stagedBufferProps);
+        WritableDirectBuffer(vk::Device &device, vk::PhysicalDevice &physicalDevice,
+                             const WritableDirectBufferProps &stagedBufferProps);
+
+        ~WritableDirectBuffer();
 
         // TODO Make RAII work so we don't have to manually call destroy methods
         void destroy();
 
-        void writeData(const void* data);
+        void writeData(const void *data);
 
         [[nodiscard]]
-        const vk::Buffer& getBuffer() const;
+        const vk::Buffer &getBuffer() const;
 
     private:
         vk::DeviceSize dataSize;
-        vk::Device& device;
-        vk::PhysicalDevice& physicalDevice;
+        vk::Device &device;
+        vk::PhysicalDevice &physicalDevice;
 
-        void* mappedMemory;
+        void *mappedMemory;
         vk::Buffer buffer;
         vk::DeviceMemory bufferMemory;
     };

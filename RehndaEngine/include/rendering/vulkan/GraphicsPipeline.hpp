@@ -16,27 +16,32 @@
 namespace Rehnda {
     class GraphicsPipeline {
     public:
-        explicit GraphicsPipeline(vk::Device &device, vk::Format imageFormat, RenderableMesh& renderableMesh, vk::DescriptorSetLayout& descriptorSetLayout);
-        void destroy();
+        explicit GraphicsPipeline(vk::Device &device, vk::Format imageFormat, RenderableMesh &renderableMesh,
+                                  vk::DescriptorSetLayout &descriptorSetLayout);
 
-        void recordCommandBuffer(vk::CommandBuffer &commandBuffer, vk::Framebuffer& targetFramebuffer, vk::DescriptorSet& currentDescriptorSet, vk::Extent2D extent);
+        ~GraphicsPipeline();
+
+        void recordCommandBuffer(vk::CommandBuffer &commandBuffer, vk::Framebuffer &targetFramebuffer,
+                                 vk::DescriptorSet &currentDescriptorSet, vk::Extent2D extent);
 
         [[nodiscard]]
         vk::RenderPass getRenderPass() const;
 
     private:
-        vk::Device& device;
+        vk::Device &device;
 
         vk::PipelineLayout pipelineLayout;
         vk::RenderPass renderPass;
         vk::Pipeline pipeline;
 
         // temp variables
-        RenderableMesh& mesh;
+        RenderableMesh &mesh;
 
     private:
-        vk::ShaderModule createShaderModule(const std::vector<char>& code);
+        vk::ShaderModule createShaderModule(const std::vector<char> &code);
 
         vk::RenderPass createRenderPass(vk::Format imageFormat);
+
+        void destroy();
     };
 }

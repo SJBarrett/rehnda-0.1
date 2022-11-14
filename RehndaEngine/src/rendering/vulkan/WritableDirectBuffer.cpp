@@ -7,9 +7,11 @@
 
 namespace Rehnda {
     WritableDirectBuffer::WritableDirectBuffer(vk::Device &device, vk::PhysicalDevice &physicalDevice,
-                                                   const WritableDirectBufferProps &directBufferProps) : dataSize(directBufferProps.dataSize),
-                                                                                       device(device),
-                                                                                       physicalDevice(physicalDevice) {
+                                               const WritableDirectBufferProps &directBufferProps) : dataSize(
+            directBufferProps.dataSize),
+                                                                                                     device(device),
+                                                                                                     physicalDevice(
+                                                                                                             physicalDevice) {
         // create the staging buffer which the host needs to be able to see (and coherent ensures the data is the same as what the CPU expects?)
         // and will be transferred from to the gpu later (hence transferSrc)
         BufferHelper::CreateBufferAndAssignMemoryProps bufferProps{
@@ -36,17 +38,20 @@ namespace Rehnda {
         // don't unmap the memory so we can write to it whenever we want
     }
 
-    void WritableDirectBuffer::destroy() {
-        device.destroyBuffer(buffer);
-        device.freeMemory(bufferMemory);
-    }
-
-
     const vk::Buffer &WritableDirectBuffer::getBuffer() const {
         return buffer;
     }
 
     void WritableDirectBuffer::writeData(const void *data) {
         memcpy(mappedMemory, data, (size_t) dataSize);
+    }
+
+    void WritableDirectBuffer::destroy() {
+        device.destroyBuffer(buffer);
+        device.freeMemory(bufferMemory);
+    }
+
+    WritableDirectBuffer::~WritableDirectBuffer() {
+        destroy();
     }
 }
