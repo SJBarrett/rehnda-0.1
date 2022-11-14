@@ -34,7 +34,7 @@ namespace Rehnda {
         memcpy(mappedMemory, stagedBufferProps.data, (size_t) stagingBufferProps.size);
         device.unmapMemory(stagingBufferMemory);
 
-        // TODO allocating memory for every buffer is not scalable as there is a max mem
+        // TODO#2 allocating memory for every buffer is not scalable as there is a max mem
         //  allocation count which is relatively low (as low as 4096 on a 1080)
         BufferHelper::CreateBufferAndAssignMemoryProps bufferProps{
                 .size = dataSize,
@@ -98,5 +98,9 @@ namespace Rehnda {
         // transfers at once and then wait for all of them
         queue.waitIdle();
         device.freeCommandBuffers(commandPool, {commandBuffer});
+    }
+
+    StagedBuffer::~StagedBuffer() {
+        destroy();
     }
 }

@@ -36,12 +36,12 @@ namespace Rehnda {
     }
 
     void RenderableMesh::destroy() {
-        vertexBuffer.destroy();
-        indexBuffer.destroy();
+//        vertexBuffer.destroy();
+//        indexBuffer.destroy();
     }
 
     RenderableMesh::~RenderableMesh() {
-        vertexBuffer.destroy();
-        indexBuffer.destroy();
+//        vertexBuffer.destroy();
+//        indexBuffer.destroy();
     }
 }

@@ -62,8 +62,6 @@ namespace Rehnda {
 
 
     private:
-        bool destroyed = false;
-
         vk::Device &device;
         const vk::SurfaceKHR &surface;
         const QueueFamilyIndices queueFamilyIndices;

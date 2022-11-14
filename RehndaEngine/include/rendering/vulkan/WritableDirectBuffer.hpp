@@ -23,9 +23,6 @@ namespace Rehnda {
 
         ~WritableDirectBuffer();
 
-        // TODO Make RAII work so we don't have to manually call destroy methods
-        void destroy();
-
         void writeData(const void *data);
 
         [[nodiscard]]
@@ -39,5 +36,7 @@ namespace Rehnda {
         void *mappedMemory;
         vk::Buffer buffer;
         vk::DeviceMemory bufferMemory;
+
+        void destroy();
     };
 }

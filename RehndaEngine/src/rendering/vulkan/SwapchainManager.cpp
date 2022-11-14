@@ -43,6 +43,7 @@ namespace Rehnda {
                 .imageExtent = extent,
                 .imageArrayLayers = 1,
                 .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
+                .oldSwapchain = swapchain
         };
 
         uint32_t indicesArray[] = {queueFamilyIndices.graphicsQueueIndex.value(),
@@ -65,7 +66,7 @@ namespace Rehnda {
 
         createInfo.presentMode = presentMode;
         createInfo.clipped = VK_TRUE; // if our window is partially hidden, we don't care about rendering those hidden values
-        // FIXME if the window is resized the swapchainManager needs to be re-created, and the previous swap chain referenced
+        // TODO#3 if the window is resized the swapchainManager needs to be re-created, and the previous swap chain referenced
         createInfo.oldSwapchain = VK_NULL_HANDLE;
         swapchain = device.createSwapchainKHR(createInfo);
         swapchainImages = device.getSwapchainImagesKHR(swapchain);
@@ -118,7 +119,6 @@ namespace Rehnda {
 
     void SwapchainManager::destroy() {
         cleanupResources();
-        destroyed = true;
     }
 
     vk::Extent2D SwapchainManager::getExtent() const {

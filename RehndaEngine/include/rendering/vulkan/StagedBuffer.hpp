@@ -11,29 +11,33 @@
 
 namespace Rehnda {
     struct StagedBufferProps {
-        const void* data;
+        const void *data;
         vk::DeviceSize dataSize;
         vk::BufferUsageFlags bufferUsageFlags;
     };
+
     class StagedBuffer {
     public:
-        StagedBuffer(vk::Device& device, vk::PhysicalDevice& physicalDevice, vk::CommandPool& commandPool, vk::Queue& queue, const StagedBufferProps& stagedBufferProps);
-        StagedBuffer(const StagedBuffer&) = delete;
+        StagedBuffer(vk::Device &device, vk::PhysicalDevice &physicalDevice, vk::CommandPool &commandPool, vk::Queue &queue,
+                     const StagedBufferProps &stagedBufferProps);
 
-        // TODO Make RAII work so we don't have to manually call destroy methods
-        void destroy();
+        StagedBuffer(const StagedBuffer &) = delete;
+        ~StagedBuffer();
 
-        const vk::Buffer& getBuffer() const;
+        [[nodiscard]]
+        const vk::Buffer &getBuffer() const;
 
     private:
         vk::DeviceSize dataSize;
-        vk::Device& device;
-        vk::PhysicalDevice& physicalDevice;
+        vk::Device &device;
+        vk::PhysicalDevice &physicalDevice;
 
         vk::Buffer buffer;
         vk::DeviceMemory bufferMemory;
 
     private:
-        void copyStagedBufferToGpu(vk::Buffer& stagingBuffer, vk::CommandPool& commandPool, vk::Queue& queue);
+        void copyStagedBufferToGpu(vk::Buffer &stagingBuffer, vk::CommandPool &commandPool, vk::Queue &queue);
+
+        void destroy();
     };
 }
