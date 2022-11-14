@@ -5,7 +5,7 @@
 #pragma once
 
 #include <GLFW/glfw3.h>
-#include <vulkan/vulkan.hpp>
+#include "rendering/vulkan/VkTypes.hpp"
 #include "core/CoreTypes.hpp"
 #include "rendering/vulkan/VulkanRenderer.hpp"
 

@@ -25,19 +25,9 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeveri
 }
 
 namespace Rehnda::VkDebugHelpers {
-    void destroy_debug_messenger(const vk::Instance &instance, vk::DebugUtilsMessengerEXT debugMessenger,
-                                 const vk::AllocationCallbacks *allocator) {
-        auto dldi = vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr);
-        instance.destroyDebugUtilsMessengerEXT(debugMessenger, allocator, dldi);
-    }
-
-    void setupDebugMessenger(const vk::Instance& instance, vk::DebugUtilsMessengerEXT* debugMessenger, const vk::AllocationCallbacks* allocator) {
+    vkr::DebugUtilsMessengerEXT setupDebugMessenger(vkr::Instance& instance) {
         vk::DebugUtilsMessengerCreateInfoEXT createInfo = build_debug_messenger_create_info();
-        auto dldi = vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr);
-        if (instance.createDebugUtilsMessengerEXT(&createInfo, allocator, debugMessenger, dldi) != vk::Result::eSuccess) {
-            SPDLOG_ERROR("Error creating debug utils messenger");
-            throw std::runtime_error("Failed to setup debug messenger");
-        }
+        return {instance, createInfo};
     }
 
     vk::DebugUtilsMessengerCreateInfoEXT build_debug_messenger_create_info() {

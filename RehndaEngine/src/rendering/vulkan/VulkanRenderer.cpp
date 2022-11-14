@@ -15,60 +15,52 @@ const std::vector<const char *> requiredDeviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
-namespace Rehnda {
-    VulkanRenderer::VulkanRenderer(GLFWwindow *window) : window(window) {
 #ifdef NDEBUG
-        enableValidationLayers = false;
+const bool enableValidationLayers = false;
 #else
-        enableValidationLayers = true;
+const bool enableValidationLayers = true;
 #endif
-        if (enableValidationLayers) {
-            instance = VkInstanceHelpers::buildVulkanInstance({"VK_LAYER_KHRONOS_validation"});
-            VkDebugHelpers::setupDebugMessenger(instance, &debugMessenger, nullptr);
-        } else {
-            instance = VkInstanceHelpers::buildVulkanInstance({});
-        }
-        if (glfwCreateWindowSurface(static_cast<VkInstance>(instance), window, nullptr,
-                                    reinterpret_cast<VkSurfaceKHR *>(&surface)) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create window surface");
-        }
 
-        physicalDevice = pickPhysicalDevice();
-
-        createDevice();
-        frameCoordinator = std::make_unique<FrameCoordinator>(window, device, physicalDevice, surface,
+namespace Rehnda {
+    // TODO#4 Don't include validation layers in release builds
+    VulkanRenderer::VulkanRenderer(GLFWwindow *window) :
+            window(window),
+            instance(VkInstanceHelpers::buildVulkanInstance(context, {"VK_LAYER_KHRONOS_validation"})),
+            debugMessenger(VkDebugHelpers::setupDebugMessenger(instance)),
+            surface(createSurface()),
+            physicalDevice(pickPhysicalDevice()),
+            queueFamilyIndices(findQueueFamilies()),
+            device(createDevice()) {
+        vk::SurfaceKHR surf = *surface;
+        frameCoordinator = std::make_unique<FrameCoordinator>(window, device, physicalDevice, surf,
                                                               queueFamilyIndices);
     }
 
     VulkanRenderer::~VulkanRenderer() {
-        if (enableValidationLayers) {
-            VkDebugHelpers::destroy_debug_messenger(instance, debugMessenger);
-        }
         frameCoordinator.reset();
         device.destroy();
-        instance.destroySurfaceKHR(surface);
-        instance.destroy();
     }
 
-    vk::PhysicalDevice VulkanRenderer::pickPhysicalDevice() const {
-        auto physicalDevices = instance.enumeratePhysicalDevices();
-        if (physicalDevices.size() == 0) {
-            throw std::runtime_error("Failed to find GPUs with Vulkan support!");
-        }
-
-        std::multimap<int, vk::PhysicalDevice> candidates;
-
-        for (const auto &device: physicalDevices) {
-            int score = rateDeviceSuitability(window, device, surface);
-            candidates.insert(std::make_pair(score, device));
-        }
-
-        // Check if the best candidate is suitable at all
-        if (candidates.rbegin()->first > 0) {
-            return candidates.rbegin()->second;
-        } else {
-            throw std::runtime_error("Failed to find suitable GPU");
-        }
+    vk::PhysicalDevice VulkanRenderer::pickPhysicalDevice() {
+        const auto physicalDevices = instance.enumeratePhysicalDevices();
+        return *physicalDevices.front();
+//        if (physicalDevices.size() == 0) {
+//            throw std::runtime_error("Failed to find GPUs with Vulkan support!");
+//        }
+//
+//        std::multimap<int, vk::PhysicalDevice> candidates;
+//
+//        for (const auto &device: physicalDevices) {
+//            int score = rateDeviceSuitability(window, device, *surface);
+//            candidates.insert(std::make_pair(score, device));
+//        }
+//
+//        // Check if the best candidate is suitable at all
+//        if (candidates.rbegin()->first > 0) {
+//            return candidates.rbegin()->second;
+//        } else {
+//            throw std::runtime_error("Failed to find suitable GPU");
+//        }
     }
 
     int VulkanRenderer::rateDeviceSuitability(GLFWwindow *window, const vk::PhysicalDevice &device,
@@ -90,11 +82,11 @@ namespace Rehnda {
             return 0;
         }
 
-        const QueueFamilyIndices indices = findQueueFamilies(device, surfaceKhr);
-        if (!indices.graphicsQueueIndex.has_value()) {
-            // we require a graphics queue to render
-            return 0;
-        }
+//        const QueueFamilyIndices indices = findQueueFamilies(device, surfaceKhr);
+//        if (!indices.graphicsQueueIndex.has_value()) {
+//            // we require a graphics queue to render
+//            return 0;
+//        }
 
         if (!areRequiredExtensionsSupported(device, requiredDeviceExtensions)) {
             return 0;
@@ -107,11 +99,10 @@ namespace Rehnda {
         return score;
     }
 
-    QueueFamilyIndices
-    VulkanRenderer::findQueueFamilies(const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr) {
+    QueueFamilyIndices VulkanRenderer::findQueueFamilies() {
         QueueFamilyIndices indices;
 
-        const auto queueFamilyProperties = device.getQueueFamilyProperties();
+        const auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
 
         int i = 0;
         for (const auto &queueFamily: queueFamilyProperties) {
@@ -119,7 +110,7 @@ namespace Rehnda {
                 indices.graphicsQueueIndex = i;
             }
 
-            if (device.getSurfaceSupportKHR(i, surfaceKhr)) {
+            if (physicalDevice.getSurfaceSupportKHR(i, *surface)) {
                 indices.presentQueueIndex = i;
             }
 
@@ -144,9 +135,7 @@ namespace Rehnda {
         return requiredExtensionsSet.empty();
     }
 
-    void VulkanRenderer::createDevice() {
-        queueFamilyIndices = findQueueFamilies(physicalDevice, surface);
-
+    vk::Device VulkanRenderer::createDevice() {
         std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
         std::set<uint32_t> uniqueQueueFamilies = {
                 queueFamilyIndices.graphicsQueueIndex.value(),
@@ -173,7 +162,7 @@ namespace Rehnda {
                 .ppEnabledExtensionNames = requiredDeviceExtensions.data(),
                 .pEnabledFeatures = &physicalDeviceFeatures,
         };
-        device = physicalDevice.createDevice(deviceCreateInfo);
+        return physicalDevice.createDevice(deviceCreateInfo);
     }
 
     void VulkanRenderer::waitForDeviceIdle() {
@@ -186,5 +175,14 @@ namespace Rehnda {
 
     void VulkanRenderer::resize() {
         frameCoordinator->setFramebufferResized();
+    }
+
+    vkr::SurfaceKHR VulkanRenderer::createSurface() {
+        VkSurfaceKHR _surface;
+        if (glfwCreateWindowSurface(static_cast<VkInstance>(*instance), window, nullptr,
+                                    &_surface) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create window surface");
+        }
+        return {instance, _surface};
     }
 }

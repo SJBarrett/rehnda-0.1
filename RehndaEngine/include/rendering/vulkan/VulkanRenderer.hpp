@@ -4,9 +4,7 @@
 
 #pragma once
 
-#define VULKAN_HPP_NO_CONSTRUCTORS
-
-#include <vulkan/vulkan.hpp>
+#include "rendering/vulkan/VkTypes.hpp"
 #include <GLFW/glfw3.h>
 #include <optional>
 #include "FrameCoordinator.hpp"
@@ -26,29 +24,33 @@ namespace Rehnda {
     private:
         NonOwner<GLFWwindow*> window;
 
-        vk::Instance instance;
-        vk::SurfaceKHR surface;
+        vkr::Context context;
+        vkr::Instance instance;
+        vkr::DebugUtilsMessengerEXT debugMessenger;
+        vkr::SurfaceKHR surface;
         vk::PhysicalDevice physicalDevice;
-        std::unique_ptr<FrameCoordinator> frameCoordinator;
-        vk::Device device;
         QueueFamilyIndices queueFamilyIndices;
+        vk::Device device;
+
+        std::unique_ptr<FrameCoordinator> frameCoordinator;
+
 
 
 
         bool enableValidationLayers;
-        vk::DebugUtilsMessengerEXT debugMessenger;
 
     private:
-        [[nodiscard]]
-        vk::PhysicalDevice pickPhysicalDevice() const;
+        vk::PhysicalDevice pickPhysicalDevice();
 
-        void createDevice();
+        vk::Device createDevice();
+
+        vkr::SurfaceKHR createSurface();
+        QueueFamilyIndices findQueueFamilies();
 
 
     private:
         static int rateDeviceSuitability(GLFWwindow* window, const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr);
 
-        static QueueFamilyIndices findQueueFamilies(const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr);
 
         static bool areRequiredExtensionsSupported(const vk::PhysicalDevice &device, const std::vector<const char *>& requiredExtensions);
     };

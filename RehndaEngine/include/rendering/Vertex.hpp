@@ -4,9 +4,9 @@
 
 #pragma once
 
-#define VULKAN_HPP_NO_CONSTRUCTORS
 
-#include <vulkan/vulkan.hpp>
+
+#include "rendering/vulkan/VkTypes.hpp"
 #include <glm/glm.hpp>
 
 namespace Rehnda {

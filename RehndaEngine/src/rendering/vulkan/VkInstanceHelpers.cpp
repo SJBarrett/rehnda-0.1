@@ -10,8 +10,8 @@
 
 
 namespace Rehnda::VkInstanceHelpers {
-    vk::Instance buildVulkanInstance(std::vector<const char*> validationLayers) {
-        vk::ApplicationInfo applicationInfo {
+    vkr::Instance buildVulkanInstance(vkr::Context &context, std::vector<const char *> validationLayers) {
+        vk::ApplicationInfo applicationInfo{
                 .pApplicationName = "Rehnda",
                 .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
                 .pEngineName = "RehndaEngine",
@@ -19,11 +19,11 @@ namespace Rehnda::VkInstanceHelpers {
                 .apiVersion = VK_API_VERSION_1_3,
         };
 
-        std::vector<const char*> required_extensions = get_required_extensions(validationLayers);
+        std::vector<const char *> required_extensions = get_required_extensions(validationLayers);
 
-        const std::vector<vk::ExtensionProperties> &extensions = vk::enumerateInstanceExtensionProperties();
+        const std::vector<vk::ExtensionProperties> &extensions = context.enumerateInstanceExtensionProperties();
         SPDLOG_DEBUG("Enabling extensions:");
-        for (const auto &extension : required_extensions) {
+        for (const auto &extension: required_extensions) {
             SPDLOG_DEBUG("{}", extension);
         }
 
@@ -35,7 +35,7 @@ namespace Rehnda::VkInstanceHelpers {
         };
         auto debugCreateInfo = VkDebugHelpers::build_debug_messenger_create_info();
         if (!validationLayers.empty()) {
-            if (are_validation_layers_supported(validationLayers)) {
+            if (are_validation_layers_supported(context, validationLayers)) {
                 instanceCreateInfo.enabledLayerCount = validationLayers.size();
                 instanceCreateInfo.ppEnabledLayerNames = validationLayers.data();
 
@@ -44,15 +44,15 @@ namespace Rehnda::VkInstanceHelpers {
                 SPDLOG_WARN("Validation layers are desired but not supported");
             }
         }
-        return vk::createInstance(instanceCreateInfo);
+        return {context, instanceCreateInfo};
     }
 
-    bool are_validation_layers_supported(const std::vector<const char*> &validationLayers) {
-        const std::vector<vk::LayerProperties> availableLayers = vk::enumerateInstanceLayerProperties();
+    bool are_validation_layers_supported(vkr::Context &context, const std::vector<const char *> &validationLayers) {
+        const std::vector<vk::LayerProperties> availableLayers = context.enumerateInstanceLayerProperties();
 
-        for (const auto& layerName : validationLayers) {
+        for (const auto &layerName: validationLayers) {
             bool layerFound = false;
-            for (const auto& layerProperties : availableLayers) {
+            for (const auto &layerProperties: availableLayers) {
                 if (strcmp(layerName, layerProperties.layerName) == 0) {
                     layerFound = true;
                     break;
@@ -69,10 +69,10 @@ namespace Rehnda::VkInstanceHelpers {
 
     std::vector<const char *> get_required_extensions(std::vector<const char *> validationLayers) {
         uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions;
+        const char **glfwExtensions;
         glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-        std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+        std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
         // if the khronos validation layer is enabled we need to enable debug utils extensions
         if (std::find(validationLayers.begin(), validationLayers.end(), "VK_LAYER_KHRONOS_validation") != extensions.end()) {

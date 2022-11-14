@@ -4,13 +4,12 @@
 
 #pragma once
 
-#define VULKAN_HPP_NO_CONSTRUCTORS
-#include <vulkan/vulkan.hpp>
+
+#include "rendering/vulkan/VkTypes.hpp"
 
 namespace Rehnda::VkDebugHelpers {
 
-    void setupDebugMessenger(const vk::Instance& instance, vk::DebugUtilsMessengerEXT* debugMessenger, const vk::AllocationCallbacks* allocator = nullptr);
-    void destroy_debug_messenger(const vk::Instance& instance, vk::DebugUtilsMessengerEXT debugMessenger, const vk::AllocationCallbacks* allocator = nullptr);
+    vkr::DebugUtilsMessengerEXT setupDebugMessenger(vkr::Instance& instance);
 
     vk::DebugUtilsMessengerCreateInfoEXT build_debug_messenger_create_info();
 };
