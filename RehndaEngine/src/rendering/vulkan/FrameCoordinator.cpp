@@ -28,20 +28,25 @@ namespace Rehnda {
             0, 1, 2, 2, 3, 0
     };
 
-    FrameCoordinator::FrameCoordinator(GLFWwindow *window, vk::Device &device, vk::PhysicalDevice &physicalDevice,
-                                       vk::SurfaceKHR &surface,
-                                       QueueFamilyIndices queueFamilyIndices) : device(device),
-                                                                                physicalDevice(physicalDevice),
-                                                                                queueFamilyIndices(queueFamilyIndices) {
-        graphicsQueue = device.getQueue(queueFamilyIndices.graphicsQueueIndex.value(), 0);
-        presentQueue = device.getQueue(queueFamilyIndices.presentQueueIndex.value(), 0);
+    FrameCoordinator::FrameCoordinator(GLFWwindow *window, vkr::Device &device, vkr::PhysicalDevice &physicalDevice,
+                                       vkr::SurfaceKHR &surface,
+                                       QueueFamilyIndices queueFamilyIndices) :
+            device(device),
+            physicalDevice(physicalDevice),
+            queueFamilyIndices(queueFamilyIndices),
+            graphicsQueue(device.getQueue(queueFamilyIndices.graphicsQueueIndex.value(), 0)),
+            presentQueue(device.getQueue(queueFamilyIndices.presentQueueIndex.value(), 0)),
+            graphicsCommandPool(createCommandPool(vk::CommandPoolCreateFlagBits::eResetCommandBuffer)),
+            memoryCommandPool(createCommandPool(vk::CommandPoolCreateFlagBits::eTransient)),
+            commandBuffers(createCommandBuffers()),
+            imageAvailableSemaphores(createSemaphores(MAX_FRAMES_IN_FLIGHT)),
+            renderFinishedSemaphores(createSemaphores(MAX_FRAMES_IN_FLIGHT)),
+            inFlightFences(createFences(MAX_FRAMES_IN_FLIGHT)),
+            uboBuffers(createUbos()),
+            descriptorSetLayout(createDescriptorSetLayout()),
+            descriptorPool(createDescriptorPool()),
+            descriptorSets(createDescriptorSets()) {
 
-        initCommandPool();
-        createCommandBuffers();
-        createDescriptorSetLayout();
-        createUbos();
-        createDescriptorPool();
-        createDescriptorSets();
         mesh = std::make_unique<RenderableMesh>(
                 DeviceContext{.device = device, .physicalDevice=physicalDevice, .memoryCommandPool = memoryCommandPool, .graphicsQueue=graphicsQueue},
                 vertices, indices);
@@ -52,65 +57,43 @@ namespace Rehnda {
         swapchainManager = std::make_unique<SwapchainManager>(device, surface, queueFamilyIndices,
                                                               graphicsPipeline->getRenderPass(),
                                                               swapChainSupportDetails);
-        createSyncObjects();
-    }
 
-    FrameCoordinator::~FrameCoordinator() {
-        device.destroyDescriptorPool(descriptorPool);
-        device.destroyDescriptorSetLayout(descriptorSetLayout);
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            device.destroySemaphore(imageAvailableSemaphores[i]);
-            device.destroySemaphore(renderFinishedSemaphores[i]);
-            device.destroyFence(inFlightFences[i]);
+            vk::DescriptorBufferInfo bufferInfo{
+                    .buffer = *uboBuffers[i].getBuffer(),
+                    .offset = 0,
+                    .range = sizeof(MVPTransforms)
+            };
+            vk::WriteDescriptorSet descriptorWrite{
+                    .dstSet = *descriptorSets[i],
+                    .dstBinding = 0,
+                    .dstArrayElement = 0,
+                    .descriptorCount = 1,
+                    .descriptorType = vk::DescriptorType::eUniformBuffer,
+                    .pImageInfo = nullptr,
+                    .pBufferInfo = &bufferInfo,
+                    .pTexelBufferView = nullptr
+            };
+            device.updateDescriptorSets(descriptorWrite, nullptr);
         }
-
-        device.destroyCommandPool(graphicsCommandPool);
-        device.destroyCommandPool(memoryCommandPool);
     }
 
-    void FrameCoordinator::initCommandPool() {
+    vkr::CommandPool FrameCoordinator::createCommandPool(vk::CommandPoolCreateFlags commandPoolCreateFlags) {
         vk::CommandPoolCreateInfo poolCreateInfo{
                 // since we are recording a command buffer every frame we want to be able to reset and rerecord, hence ResetCommandBuffer
-                .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+                .flags = commandPoolCreateFlags,
                 .queueFamilyIndex = queueFamilyIndices.graphicsQueueIndex.value(),
         };
-        graphicsCommandPool = device.createCommandPool(poolCreateInfo);
-
-        // separate command pool for memory oriented commands such as copying to GPU buffers as they are short lived
-        vk::CommandPoolCreateInfo memoryCommandsPoolCreateInfo{
-                // since we are recording a command buffer every frame we want to be able to reset and rerecord, hence ResetCommandBuffer
-                .flags = vk::CommandPoolCreateFlagBits::eTransient,
-                .queueFamilyIndex = queueFamilyIndices.graphicsQueueIndex.value(),
-        };
-        memoryCommandPool = device.createCommandPool(memoryCommandsPoolCreateInfo);
+        return {device, poolCreateInfo};
     }
 
-    void FrameCoordinator::createSyncObjects() {
-        imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-        renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-        inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-
-        vk::SemaphoreCreateInfo semaphoreCreateInfo{};
-        vk::FenceCreateInfo fenceCreateInfo{
-                // fence needs to start signaled for the first loop
-                .flags = vk::FenceCreateFlagBits::eSignaled,
-        };
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            imageAvailableSemaphores[i] = device.createSemaphore(semaphoreCreateInfo);
-            renderFinishedSemaphores[i] = device.createSemaphore(semaphoreCreateInfo);
-            inFlightFences[i] = device.createFence(fenceCreateInfo);
-        }
-    }
-
-    void FrameCoordinator::createCommandBuffers() {
-        commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    vkr::CommandBuffers FrameCoordinator::createCommandBuffers() {
         vk::CommandBufferAllocateInfo commandBufferAllocateInfo{
-                .commandPool = graphicsCommandPool,
+                .commandPool = *graphicsCommandPool,
                 .level = vk::CommandBufferLevel::ePrimary,
-                .commandBufferCount = static_cast<uint32_t>(commandBuffers.size()),
+                .commandBufferCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
         };
-        commandBuffers = device.allocateCommandBuffers(commandBufferAllocateInfo);
+        return {device, commandBufferAllocateInfo};
     }
 
     /**
@@ -123,23 +106,22 @@ namespace Rehnda {
      */
     DrawFrameResult FrameCoordinator::drawFrame() {
         // waiting for fences would fail if we exit this method early and reset fences immediately before new work is submitted
-        const auto waitResult = device.waitForFences({inFlightFences[currentFrame]}, VK_TRUE, UINT64_MAX);
+        const auto waitResult = device.waitForFences({*inFlightFences[currentFrame]}, VK_TRUE, UINT64_MAX);
         assert(waitResult == vk::Result::eSuccess);
 
-        vk::ResultValue<uint32_t> nextImageIndexResult = swapchainManager->acquireNextImageIndex(
+        const auto [result, nextImageIndex] = swapchainManager->acquireNextImageIndex(
                 imageAvailableSemaphores[currentFrame]);
-        if (nextImageIndexResult.result == vk::Result::eErrorOutOfDateKHR || framebufferResized) {
+        if (result == vk::Result::eErrorOutOfDateKHR || framebufferResized) {
             framebufferResized = false;
             swapchainManager->resize(graphicsPipeline->getRenderPass());
             return DrawFrameResult::SWAPCHAIN_OUT_OF_DATE;
-        } else if (nextImageIndexResult.result != vk::Result::eSuccess &&
-                   nextImageIndexResult.result != vk::Result::eSuboptimalKHR) {
+        } else if (result != vk::Result::eSuccess &&
+                   result != vk::Result::eSuboptimalKHR) {
             throw std::runtime_error("Failed to acquire swap chain image");
         }
-        auto nextImageIndex = nextImageIndexResult.value;
 
         // reset only once we have submitted work and know we won't exit early due to swapchain out of date
-        device.resetFences({inFlightFences[currentFrame]});
+        device.resetFences({*inFlightFences[currentFrame]});
 
         updateUniformBuffer(currentFrame);
 
@@ -148,21 +130,20 @@ namespace Rehnda {
                                               swapchainManager->getSwapchainFramebuffer(nextImageIndex),
                                               descriptorSets[currentFrame], swapchainManager->getExtent());
 
-        vk::Semaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
-        std::vector<vk::Semaphore> signalSemaphores{renderFinishedSemaphores[currentFrame]};
+        vk::Semaphore waitSemaphores[] = {*imageAvailableSemaphores[currentFrame]};
+        std::vector<vk::Semaphore> signalSemaphores{*renderFinishedSemaphores[currentFrame]};
         vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
         vk::SubmitInfo submitInfo{
                 .waitSemaphoreCount = 1,
                 .pWaitSemaphores = waitSemaphores,
                 .pWaitDstStageMask = waitStages,
                 .commandBufferCount = 1,
-                .pCommandBuffers = &commandBuffers[currentFrame],
+                .pCommandBuffers = &*commandBuffers[currentFrame],
                 .signalSemaphoreCount = 1,
                 .pSignalSemaphores = signalSemaphores.data(),
         };
 
-        const auto submitResult = graphicsQueue.submit(1, &submitInfo, inFlightFences[currentFrame]);
-        assert(submitResult == vk::Result::eSuccess);
+        graphicsQueue.submit(submitInfo, *inFlightFences[currentFrame]);
 
         if (swapchainManager->present(signalSemaphores, presentQueue, nextImageIndex) ==
             PresentResult::SWAPCHAIN_OUT_OF_DATE) {
@@ -174,7 +155,7 @@ namespace Rehnda {
     }
 
 
-    void FrameCoordinator::createDescriptorSetLayout() {
+    vkr::DescriptorSetLayout FrameCoordinator::createDescriptorSetLayout() {
         vk::DescriptorSetLayoutBinding uboLayoutBinding{
                 .binding = 0,
                 .descriptorType = vk::DescriptorType::eUniformBuffer,
@@ -187,10 +168,10 @@ namespace Rehnda {
                 .bindingCount = 1,
                 .pBindings = &uboLayoutBinding
         };
-        descriptorSetLayout = device.createDescriptorSetLayout(layoutCreateInfo);
+        return {device, layoutCreateInfo};
     }
 
-    void FrameCoordinator::createUbos() {
+    std::vector<WritableDirectBuffer> FrameCoordinator::createUbos() {
         vk::DeviceSize bufferSize = sizeof(MVPTransforms);
         MVPTransforms defaultTransform{};
         const WritableDirectBufferProps bufferProps{
@@ -198,10 +179,11 @@ namespace Rehnda {
                 .bufferUsageFlags = vk::BufferUsageFlagBits::eUniformBuffer,
                 .data = &defaultTransform
         };
-        uboBuffers.reserve(MAX_FRAMES_IN_FLIGHT);
+        std::vector<WritableDirectBuffer> buffers;
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            uboBuffers.emplace_back(device, physicalDevice, bufferProps);
+            buffers.emplace_back(device, physicalDevice, bufferProps);
         }
+        return buffers;
     }
 
     void FrameCoordinator::setFramebufferResized() {
@@ -226,43 +208,47 @@ namespace Rehnda {
         uboBuffers[currentImage].writeData(&mvpTransforms);
     }
 
-    void FrameCoordinator::createDescriptorPool() {
+    vkr::DescriptorPool FrameCoordinator::createDescriptorPool() {
         vk::DescriptorPoolSize poolSize{
                 .descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
         };
         vk::DescriptorPoolCreateInfo poolCreateInfo{
+                .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
                 .maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
                 .poolSizeCount = 1,
                 .pPoolSizes = &poolSize
         };
-        descriptorPool = device.createDescriptorPool(poolCreateInfo);
+        return {device, poolCreateInfo};
     }
 
-    void FrameCoordinator::createDescriptorSets() {
-        std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+    vkr::DescriptorSets FrameCoordinator::createDescriptorSets() {
+        std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, *descriptorSetLayout);
         vk::DescriptorSetAllocateInfo descriptorSetAllocateInfo{
-                .descriptorPool = descriptorPool,
+                .descriptorPool = *descriptorPool,
                 .descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
                 .pSetLayouts = layouts.data()
         };
-        descriptorSets = device.allocateDescriptorSets(descriptorSetAllocateInfo);
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vk::DescriptorBufferInfo bufferInfo{
-                    .buffer = uboBuffers[i].getBuffer(),
-                    .offset = 0,
-                    .range = sizeof(MVPTransforms)
-            };
-            vk::WriteDescriptorSet descriptorWrite{
-                    .dstSet = descriptorSets[i],
-                    .dstBinding = 0,
-                    .dstArrayElement = 0,
-                    .descriptorCount = 1,
-                    .descriptorType = vk::DescriptorType::eUniformBuffer,
-                    .pImageInfo = nullptr,
-                    .pBufferInfo = &bufferInfo,
-                    .pTexelBufferView = nullptr
-            };
-            device.updateDescriptorSets({descriptorWrite}, nullptr);
+        return {device, descriptorSetAllocateInfo};
+    }
+
+    std::vector<vkr::Semaphore> FrameCoordinator::createSemaphores(size_t numToCreate) {
+        vk::SemaphoreCreateInfo semaphoreCreateInfo{};
+        std::vector<vkr::Semaphore> semaphores;
+        for (size_t i = 0; i < numToCreate; i++) {
+            semaphores.emplace_back(device, semaphoreCreateInfo);
         }
+        return semaphores;
+    }
+
+    std::vector<vkr::Fence> FrameCoordinator::createFences(size_t numToCreate) {
+        vk::FenceCreateInfo fenceCreateInfo{
+                // fence needs to start signaled for the first loop
+                .flags = vk::FenceCreateFlagBits::eSignaled,
+        };
+        std::vector<vkr::Fence> fences;
+        for (size_t i = 0; i < numToCreate; i++) {
+            fences.emplace_back(device, fenceCreateInfo);
+        }
+        return fences;
     }
 }

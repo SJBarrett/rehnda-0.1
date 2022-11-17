@@ -6,101 +6,88 @@
 #include "rendering/vulkan/BufferHelper.hpp"
 
 namespace Rehnda {
-    StagedBuffer::StagedBuffer(vk::Device &device, vk::PhysicalDevice &physicalDevice, vk::CommandPool &commandPool,
-                               vk::Queue &queue, const StagedBufferProps& stagedBufferProps) : dataSize(stagedBufferProps.dataSize), device(device), physicalDevice(physicalDevice) {
+    StagedBuffer::StagedBuffer(vkr::Device &device, vkr::PhysicalDevice &physicalDevice, vkr::CommandPool &commandPool,
+                               vkr::Queue &queue, const StagedBufferProps &stagedBufferProps) :
+            dataSize(stagedBufferProps.dataSize),
+            device(device),
+            physicalDevice(physicalDevice),
+            buffer(initBuffer(stagedBufferProps.bufferUsageFlags)),
+            bufferMemory(initBufferMemory()) {
+        buffer.bindMemory(*bufferMemory, 0);
         // create the staging buffer which the host needs to be able to see (and coherent ensures the data is the same as what the CPU expects?)
         // and will be transferred from to the gpu later (hence transferSrc)
-        vk::Buffer stagingBuffer;
-        vk::DeviceMemory stagingBufferMemory;
         BufferHelper::CreateBufferAndAssignMemoryProps stagingBufferProps{
                 .size = dataSize,
                 .bufferUsage = vk::BufferUsageFlagBits::eTransferSrc,
                 .requiredMemoryProperties = vk::MemoryPropertyFlagBits::eHostVisible |
                                             vk::MemoryPropertyFlagBits::eHostCoherent
         };
-        BufferHelper::createBuffer(
+        auto [stagingBuffer, stagingBufferMemory] = BufferHelper::createBuffer(
                 device,
                 physicalDevice,
-                stagingBufferProps,
-                stagingBuffer,
-                stagingBufferMemory
+                stagingBufferProps
         );
 
 
         // put the data into the staging buffer
-        void *mappedMemory;
-        assert(device.mapMemory(stagingBufferMemory, 0, stagingBufferProps.size, vk::MemoryMapFlags{}, &mappedMemory) ==
-               vk::Result::eSuccess);
+        void *mappedMemory = stagingBufferMemory.mapMemory(0, stagedBufferProps.dataSize, vk::MemoryMapFlags{});
         memcpy(mappedMemory, stagedBufferProps.data, (size_t) stagingBufferProps.size);
-        device.unmapMemory(stagingBufferMemory);
+        stagingBufferMemory.unmapMemory();
 
         // TODO#2 allocating memory for every buffer is not scalable as there is a max mem
         //  allocation count which is relatively low (as low as 4096 on a 1080)
-        BufferHelper::CreateBufferAndAssignMemoryProps bufferProps{
-                .size = dataSize,
-                .bufferUsage = stagedBufferProps.bufferUsageFlags | vk::BufferUsageFlagBits::eTransferDst,
-                .requiredMemoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal
-        };
-        BufferHelper::createBuffer(
-                device,
-                physicalDevice,
-                bufferProps,
-                buffer,
-                bufferMemory
-        );
-
-        copyStagedBufferToGpu(stagingBuffer, commandPool, queue);
-
-        device.destroyBuffer(stagingBuffer);
-        device.freeMemory(stagingBufferMemory);
-    }
-
-    void StagedBuffer::destroy() {
-        device.destroyBuffer(buffer);
-        device.freeMemory(bufferMemory);
-    }
-
-
-    const vk::Buffer &StagedBuffer::getBuffer() const {
-        return buffer;
-    }
-
-    void
-    StagedBuffer::copyStagedBufferToGpu(vk::Buffer &stagingBuffer, vk::CommandPool &commandPool, vk::Queue &queue) {
         vk::CommandBufferAllocateInfo allocateInfo{
-                .commandPool = commandPool,
+                .commandPool = *commandPool,
                 .level = vk::CommandBufferLevel::ePrimary,
                 .commandBufferCount = 1
         };
 
-        vk::CommandBuffer commandBuffer = device.allocateCommandBuffers(allocateInfo)[0];
+        vkr::CommandBuffers commandBuffers{device, allocateInfo};
+        vkr::CommandBuffer &commandBuffer = commandBuffers.front();
 
         vk::CommandBufferBeginInfo beginInfo{
                 .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
         };
         commandBuffer.begin(beginInfo);
 
-        std::array<vk::BufferCopy, 1> bufferCopy{
-                vk::BufferCopy{
-                        .srcOffset = 0,
-                        .dstOffset = 0,
-                        .size = dataSize
-                }
+        vk::BufferCopy bufferCopy{
+                .srcOffset = 0,
+                .dstOffset = 0,
+                .size = dataSize
         };
-        commandBuffer.copyBuffer(stagingBuffer, buffer, bufferCopy);
+        commandBuffer.copyBuffer(*stagingBuffer, *buffer, bufferCopy);
         commandBuffer.end();
 
         queue.submit({vk::SubmitInfo{
                 .commandBufferCount = 1,
-                .pCommandBuffers = &commandBuffer
+                .pCommandBuffers = &*commandBuffer
         }});
         // Instead of waiting on the queue to confirm the memory has been copied can use fences to queue multiple
         // transfers at once and then wait for all of them
         queue.waitIdle();
-        device.freeCommandBuffers(commandPool, {commandBuffer});
     }
 
-    StagedBuffer::~StagedBuffer() {
-        destroy();
+    const vkr::Buffer &StagedBuffer::getBuffer() const {
+        return buffer;
+    }
+
+    vkr::Buffer StagedBuffer::initBuffer(vk::BufferUsageFlags bufferUsageFlags) {
+        vk::BufferCreateInfo bufferCreateInfo{
+                .size = dataSize,
+                .usage = bufferUsageFlags | vk::BufferUsageFlagBits::eTransferDst,
+                // this buffer is only used by the graphics queue, so can be exclusive
+                .sharingMode = vk::SharingMode::eExclusive
+        };
+        return {device, bufferCreateInfo};
+    }
+
+    vkr::DeviceMemory StagedBuffer::initBufferMemory() {
+        vk::MemoryRequirements memoryRequirements = buffer.getMemoryRequirements();
+        vk::MemoryAllocateInfo memoryAllocateInfo{
+                .allocationSize = dataSize,
+                .memoryTypeIndex = BufferHelper::findMemoryType(physicalDevice, memoryRequirements.memoryTypeBits,
+                                                                vk::MemoryPropertyFlagBits::eDeviceLocal)
+        };
+        return {device, memoryAllocateInfo};
     }
 }

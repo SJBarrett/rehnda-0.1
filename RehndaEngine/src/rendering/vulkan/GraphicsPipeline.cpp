@@ -18,10 +18,26 @@ namespace Rehnda {
      * @param device
      * @param swapchainManager
      */
-    GraphicsPipeline::GraphicsPipeline(vk::Device &device, vk::Format imageFormat, RenderableMesh &renderableMesh,
-                                       vk::DescriptorSetLayout &descriptorSetLayout) :
-            device(device), mesh(renderableMesh) {
-        renderPass = createRenderPass(imageFormat);
+    GraphicsPipeline::GraphicsPipeline(vkr::Device &device, vk::Format imageFormat, RenderableMesh &renderableMesh,
+                                       vkr::DescriptorSetLayout &descriptorSetLayout) :
+            device(device),
+            renderPass(createRenderPass(imageFormat)),
+            pipelineLayout(createPipelineLayout(descriptorSetLayout)),
+            pipeline(createPipeline()),
+            mesh(renderableMesh) {
+    }
+
+    vkr::PipelineLayout GraphicsPipeline::createPipelineLayout(vkr::DescriptorSetLayout &descriptorSetLayout) {
+        vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{
+                .setLayoutCount = 1,
+                .pSetLayouts = &*descriptorSetLayout,
+                .pushConstantRangeCount = 0,
+                .pPushConstantRanges = nullptr,
+        };
+        return {device, pipelineLayoutCreateInfo};
+    }
+
+    vkr::Pipeline GraphicsPipeline::createPipeline() {
         auto vertShaderCode = FileUtils::readFileAsBytes("shaders/triangle.vert.spv");
         auto fragShaderCode = FileUtils::readFileAsBytes("shaders/triangle.frag.spv");
 
@@ -31,13 +47,13 @@ namespace Rehnda {
         // can use pSpecializationInfo to specify shader constants at compile time, which allows the compiler to optimise
         vk::PipelineShaderStageCreateInfo vertShaderStageCreateInfo{
                 .stage = vk::ShaderStageFlagBits::eVertex,
-                .module = vertShaderModule,
+                .module = *vertShaderModule,
                 .pName = "main",
         };
 
         vk::PipelineShaderStageCreateInfo fragShaderStageCreateInfo{
                 .stage = vk::ShaderStageFlagBits::eFragment,
-                .module = fragShaderModule,
+                .module = *fragShaderModule,
                 .pName = "main",
         };
 
@@ -108,14 +124,6 @@ namespace Rehnda {
                 .pAttachments = &colorBlendAttachmentState,
         };
 
-        vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo{
-                .setLayoutCount = 1,
-                .pSetLayouts = &descriptorSetLayout,
-                .pushConstantRangeCount = 0,
-                .pPushConstantRanges = nullptr,
-        };
-        pipelineLayout = device.createPipelineLayout(pipelineLayoutCreateInfo);
-
         vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo{
                 // --- SHADER STAGE DESCRIPTIONS ---
                 .stageCount = 2,
@@ -130,37 +138,27 @@ namespace Rehnda {
                 .pColorBlendState = &colorBlending,
                 .pDynamicState = &dynamicStateCreateInfo,
                 // --- PIPELINE LAYOUT ---
-                .layout = pipelineLayout,
+                .layout = *pipelineLayout,
                 // --- RENDER PASS ---
-                .renderPass = renderPass,
+                .renderPass = *renderPass,
                 .subpass = 0,
                 // --- OPTIONAL BASE PIPELINE,
                 .basePipelineHandle = VK_NULL_HANDLE,
                 .basePipelineIndex = -1,
         };
 
-        pipeline = device.createGraphicsPipeline(VK_NULL_HANDLE, graphicsPipelineCreateInfo).value;
-
-        // shader modules can be destroy ed after the spir-v is compiled and linked to machine code during pipeline creation
-        device.destroyShaderModule(vertShaderModule);
-        device.destroyShaderModule(fragShaderModule);
+        return {device, VK_NULL_HANDLE, graphicsPipelineCreateInfo};
     }
 
-    vk::ShaderModule GraphicsPipeline::createShaderModule(const std::vector<char> &code) {
+    vkr::ShaderModule GraphicsPipeline::createShaderModule(const std::vector<char> &code) {
         vk::ShaderModuleCreateInfo createInfo{
                 .codeSize = code.size(),
                 .pCode = reinterpret_cast<const uint32_t *>(code.data()),
         };
-        return device.createShaderModule(createInfo);
+        return {device, createInfo};
     }
 
-    void GraphicsPipeline::destroy() {
-        device.destroyPipeline(pipeline);
-        device.destroyPipelineLayout(pipelineLayout);
-        device.destroyRenderPass(renderPass);
-    }
-
-    vk::RenderPass GraphicsPipeline::createRenderPass(vk::Format imageFormat) {
+    vkr::RenderPass GraphicsPipeline::createRenderPass(vk::Format imageFormat) {
         vk::AttachmentDescription colorAttachment{
                 .format = imageFormat,
                 .samples = vk::SampleCountFlagBits::e1,
@@ -204,12 +202,12 @@ namespace Rehnda {
                 .pDependencies = &subpassDependency,
         };
 
-        return device.createRenderPass(renderPassCreateInfo);
+        return {device, renderPassCreateInfo};
     }
 
 
-    void GraphicsPipeline::recordCommandBuffer(vk::CommandBuffer &commandBuffer, vk::Framebuffer &targetFramebuffer,
-                                               vk::DescriptorSet &currentDescriptorSet, vk::Extent2D extent) {
+    void GraphicsPipeline::recordCommandBuffer(vkr::CommandBuffer &commandBuffer, vkr::Framebuffer &targetFramebuffer,
+                                               vkr::DescriptorSet &currentDescriptorSet, vk::Extent2D extent) {
         vk::CommandBufferBeginInfo beginInfo{};
         commandBuffer.begin(beginInfo); // this implicitly resets the buffer
 
@@ -220,8 +218,8 @@ namespace Rehnda {
         };
 
         vk::RenderPassBeginInfo renderPassBeginInfo{
-                .renderPass = renderPass,
-                .framebuffer = targetFramebuffer,
+                .renderPass = *renderPass,
+                .framebuffer = *targetFramebuffer,
                 .renderArea = {
                         .offset = {0, 0},
                         .extent = extent,
@@ -232,7 +230,7 @@ namespace Rehnda {
 
         commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
 
-        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+        commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
 
         vk::Viewport viewport{
                 .x = 0.0f,
@@ -242,14 +240,14 @@ namespace Rehnda {
                 .minDepth = 0.0f,
                 .maxDepth = 1.0f,
         };
-        commandBuffer.setViewport(0, 1, &viewport);
+        commandBuffer.setViewport(0, viewport);
 
         vk::Rect2D scissor{
                 .offset = {0, 0},
                 .extent = extent,
         };
-        commandBuffer.setScissor(0, 1, &scissor);
-        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, {currentDescriptorSet},
+        commandBuffer.setScissor(0, scissor);
+        commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipelineLayout, 0, {*currentDescriptorSet},
                                          nullptr);
 
         mesh.draw(commandBuffer);
@@ -258,12 +256,7 @@ namespace Rehnda {
         commandBuffer.end();
     }
 
-    vk::RenderPass GraphicsPipeline::getRenderPass() const {
+    const vkr::RenderPass& GraphicsPipeline::getRenderPass() const {
         return renderPass;
     }
-
-    GraphicsPipeline::~GraphicsPipeline() {
-        destroy();
-    }
-
 }

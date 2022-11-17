@@ -31,40 +31,33 @@ namespace Rehnda {
             physicalDevice(pickPhysicalDevice()),
             queueFamilyIndices(findQueueFamilies()),
             device(createDevice()) {
-        vk::SurfaceKHR surf = *surface;
-        frameCoordinator = std::make_unique<FrameCoordinator>(window, device, physicalDevice, surf,
-                                                              queueFamilyIndices);
+        createDevice();
+        frameCoordinator = std::make_unique<FrameCoordinator>(window, device, physicalDevice, surface, queueFamilyIndices);
     }
 
-    VulkanRenderer::~VulkanRenderer() {
-        frameCoordinator.reset();
-        device.destroy();
-    }
-
-    vk::PhysicalDevice VulkanRenderer::pickPhysicalDevice() {
+    vkr::PhysicalDevice VulkanRenderer::pickPhysicalDevice() {
         const auto physicalDevices = instance.enumeratePhysicalDevices();
-        return *physicalDevices.front();
-//        if (physicalDevices.size() == 0) {
-//            throw std::runtime_error("Failed to find GPUs with Vulkan support!");
-//        }
-//
-//        std::multimap<int, vk::PhysicalDevice> candidates;
-//
-//        for (const auto &device: physicalDevices) {
-//            int score = rateDeviceSuitability(window, device, *surface);
-//            candidates.insert(std::make_pair(score, device));
-//        }
-//
-//        // Check if the best candidate is suitable at all
-//        if (candidates.rbegin()->first > 0) {
-//            return candidates.rbegin()->second;
-//        } else {
-//            throw std::runtime_error("Failed to find suitable GPU");
-//        }
+        if (physicalDevices.empty()) {
+            throw std::runtime_error("Failed to find GPUs with Vulkan support!");
+        }
+
+        std::multimap<int, vkr::PhysicalDevice> candidates;
+
+        for (const auto &device: physicalDevices) {
+            int score = rateDeviceSuitability(window, device, surface);
+            candidates.insert(std::make_pair(score, device));
+        }
+
+        // Check if the best candidate is suitable at all
+        if (candidates.rbegin()->first > 0) {
+            return candidates.rbegin()->second;
+        } else {
+            throw std::runtime_error("Failed to find suitable GPU");
+        }
     }
 
-    int VulkanRenderer::rateDeviceSuitability(GLFWwindow *window, const vk::PhysicalDevice &device,
-                                              const vk::SurfaceKHR &surfaceKhr) {
+    int VulkanRenderer::rateDeviceSuitability(GLFWwindow *window, const vkr::PhysicalDevice &device,
+                                              const vkr::SurfaceKHR &surfaceKhr) {
         const auto deviceProperties = device.getProperties();
         const auto deviceFeatures = device.getFeatures();
         int score = 1;
@@ -123,7 +116,7 @@ namespace Rehnda {
         return indices;
     }
 
-    bool VulkanRenderer::areRequiredExtensionsSupported(const vk::PhysicalDevice &device,
+    bool VulkanRenderer::areRequiredExtensionsSupported(const vkr::PhysicalDevice &device,
                                                         const std::vector<const char *> &requiredExtensions) {
         const auto availableExtensions = device.enumerateDeviceExtensionProperties();
         std::set<std::string> requiredExtensionsSet(requiredExtensions.begin(), requiredExtensions.end());
@@ -135,7 +128,7 @@ namespace Rehnda {
         return requiredExtensionsSet.empty();
     }
 
-    vk::Device VulkanRenderer::createDevice() {
+    vkr::Device VulkanRenderer::createDevice() {
         std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
         std::set<uint32_t> uniqueQueueFamilies = {
                 queueFamilyIndices.graphicsQueueIndex.value(),
@@ -162,7 +155,7 @@ namespace Rehnda {
                 .ppEnabledExtensionNames = requiredDeviceExtensions.data(),
                 .pEnabledFeatures = &physicalDeviceFeatures,
         };
-        return physicalDevice.createDevice(deviceCreateInfo);
+        return {physicalDevice, deviceCreateInfo};
     }
 
     void VulkanRenderer::waitForDeviceIdle() {

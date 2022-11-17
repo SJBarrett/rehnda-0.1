@@ -8,6 +8,7 @@
 
 #include "rendering/vulkan/VkTypes.hpp"
 #include "rendering/Vertex.hpp"
+#include "core/CoreTypes.hpp"
 
 namespace Rehnda {
     struct StagedBufferProps {
@@ -18,26 +19,24 @@ namespace Rehnda {
 
     class StagedBuffer {
     public:
-        StagedBuffer(vk::Device &device, vk::PhysicalDevice &physicalDevice, vk::CommandPool &commandPool, vk::Queue &queue,
+        StagedBuffer(vkr::Device &device, vkr::PhysicalDevice &physicalDevice, vkr::CommandPool &commandPool, vkr::Queue &queue,
                      const StagedBufferProps &stagedBufferProps);
 
         StagedBuffer(const StagedBuffer &) = delete;
-        ~StagedBuffer();
 
         [[nodiscard]]
-        const vk::Buffer &getBuffer() const;
+        const vkr::Buffer& getBuffer() const;
 
     private:
         vk::DeviceSize dataSize;
-        vk::Device &device;
-        vk::PhysicalDevice &physicalDevice;
+        vkr::Device &device;
+        vkr::PhysicalDevice &physicalDevice;
 
-        vk::Buffer buffer;
-        vk::DeviceMemory bufferMemory;
+        vkr::Buffer buffer;
+        vkr::DeviceMemory bufferMemory;
 
     private:
-        void copyStagedBufferToGpu(vk::Buffer &stagingBuffer, vk::CommandPool &commandPool, vk::Queue &queue);
-
-        void destroy();
+        vkr::Buffer initBuffer( vk::BufferUsageFlags bufferUsageFlags);
+        vkr::DeviceMemory initBufferMemory();
     };
 }

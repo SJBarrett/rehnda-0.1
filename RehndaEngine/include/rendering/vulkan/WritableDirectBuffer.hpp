@@ -18,25 +18,24 @@ namespace Rehnda {
 
     class WritableDirectBuffer {
     public:
-        WritableDirectBuffer(vk::Device &device, vk::PhysicalDevice &physicalDevice,
+        WritableDirectBuffer(vkr::Device &device, vkr::PhysicalDevice &physicalDevice,
                              const WritableDirectBufferProps &stagedBufferProps);
-
-        ~WritableDirectBuffer();
 
         void writeData(const void *data);
 
         [[nodiscard]]
-        const vk::Buffer &getBuffer() const;
+        const vkr::Buffer &getBuffer() const;
 
     private:
         vk::DeviceSize dataSize;
-        vk::Device &device;
-        vk::PhysicalDevice &physicalDevice;
+        vkr::Device &device;
+        vkr::PhysicalDevice &physicalDevice;
 
         void *mappedMemory;
-        vk::Buffer buffer;
-        vk::DeviceMemory bufferMemory;
+        vkr::Buffer buffer;
+        vkr::DeviceMemory bufferMemory;
 
-        void destroy();
+        vkr::Buffer initBuffer(vk::BufferUsageFlags bufferUsageFlags);
+        vkr::DeviceMemory initDeviceMemory();
     };
 }

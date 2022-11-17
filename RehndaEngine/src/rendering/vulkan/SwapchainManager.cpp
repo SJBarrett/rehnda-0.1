@@ -6,27 +6,24 @@
 #include <limits>
 
 namespace Rehnda {
-    SwapchainManager::SwapchainManager(vk::Device &device,
-                                       const vk::SurfaceKHR &surface, QueueFamilyIndices indices,
-                                       const vk::RenderPass &renderPass,
-                                       const SwapChainSupportDetails &swapChainSupportDetails) : device(device),
-                                                                                                 surface(surface),
-                                                                                                 queueFamilyIndices(
-                                                                                                         indices),
-                                                                                                 swapChainSupportDetails(
-                                                                                                         swapChainSupportDetails) {
-        createSwapchain();
-        createImageViews();
-        initSwapchainBuffers(renderPass);
+    SwapchainManager::SwapchainManager(vkr::Device &device, const vkr::SurfaceKHR &surface, QueueFamilyIndices indices,
+                                       const vkr::RenderPass &renderPass, const SwapChainSupportDetails &swapChainSupportDetails) :
+            device(device),
+            surface(surface),
+            queueFamilyIndices(
+                    indices),
+            swapChainSupportDetails(
+                    swapChainSupportDetails),
+            swapchainSurfaceFormat(swapChainSupportDetails.chooseSwapSurfaceFormat()),
+            swapchainExtent(swapChainSupportDetails.chooseSwapExtent()),
+            swapchain(createSwapchain()),
+            swapchainImageViews(createImageViews()),
+            swapchainFramebuffers(createFrameBuffers(renderPass)){
+
     }
 
-    void SwapchainManager::createSwapchain() {
-        const auto surfaceFormat = swapChainSupportDetails.chooseSwapSurfaceFormat();
+    vkr::SwapchainKHR SwapchainManager::createSwapchain() {
         const auto presentMode = swapChainSupportDetails.chooseSwapPresentMode();
-        const auto extent = swapChainSupportDetails.chooseSwapExtent();
-
-        swapchainImageFormat = surfaceFormat.format;
-        swapchainExtent = extent;
 
         // want one more than the minimum, so we don't have to wait for the driver to complete operations
         uint32_t imageCount = swapChainSupportDetails.capabilities.minImageCount + 1;
@@ -36,14 +33,13 @@ namespace Rehnda {
         }
 
         vk::SwapchainCreateInfoKHR createInfo = {
-                .surface = surface,
+                .surface = *surface,
                 .minImageCount = imageCount,
-                .imageFormat = surfaceFormat.format,
-                .imageColorSpace = surfaceFormat.colorSpace,
-                .imageExtent = extent,
+                .imageFormat = swapchainSurfaceFormat.format,
+                .imageColorSpace = swapchainSurfaceFormat.colorSpace,
+                .imageExtent = swapchainExtent,
                 .imageArrayLayers = 1,
-                .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
-                .oldSwapchain = swapchain
+                .imageUsage = vk::ImageUsageFlagBits::eColorAttachment
         };
 
         uint32_t indicesArray[] = {queueFamilyIndices.graphicsQueueIndex.value(),
@@ -68,26 +64,24 @@ namespace Rehnda {
         createInfo.clipped = VK_TRUE; // if our window is partially hidden, we don't care about rendering those hidden values
         // TODO#3 if the window is resized the swapchainManager needs to be re-created, and the previous swap chain referenced
         createInfo.oldSwapchain = VK_NULL_HANDLE;
-        swapchain = device.createSwapchainKHR(createInfo);
-        swapchainImages = device.getSwapchainImagesKHR(swapchain);
+       return {device, createInfo};
     }
 
-    void SwapchainManager::resize(const vk::RenderPass &renderPass) {
+    void SwapchainManager::resize(const vkr::RenderPass &renderPass) {
         device.waitIdle();
-        cleanupResources();
         createSwapchain();
         createImageViews();
-        initSwapchainBuffers(renderPass);
+        createFrameBuffers(renderPass);
     }
 
-    void SwapchainManager::createImageViews() {
-        swapchainImageViews.resize(swapchainImages.size());
-
+    std::vector<vkr::ImageView> SwapchainManager::createImageViews() {
+        const std::vector<VkImage> swapchainImages = swapchain.getImages();
+        std::vector<vkr::ImageView> imageViews;
         for (size_t i = 0; i < swapchainImages.size(); i++) {
             vk::ImageViewCreateInfo imageViewCreateInfo{
                     .image = swapchainImages[i],
                     .viewType = vk::ImageViewType::e2D,
-                    .format = swapchainImageFormat,
+                    .format = swapchainSurfaceFormat.format,
                     .components = {
                             .r = vk::ComponentSwizzle::eIdentity,
                             .g = vk::ComponentSwizzle::eIdentity,
@@ -102,39 +96,25 @@ namespace Rehnda {
                             .layerCount = 1,
                     },
             };
-            swapchainImageViews[i] = device.createImageView(imageViewCreateInfo);
+            imageViews.emplace_back(device, imageViewCreateInfo);
         }
-    }
-
-    void SwapchainManager::cleanupResources() {
-        // TODO: To support moving between SDR and HDR monitors the renderpass would need to be recreated too
-        for (auto framebuffer: swapchainFramebuffers) {
-            device.destroyFramebuffer(framebuffer);
-        }
-        device.destroySwapchainKHR(swapchain);
-        for (auto &swapchainImageView: swapchainImageViews) {
-            device.destroyImageView(swapchainImageView);
-        }
-    }
-
-    void SwapchainManager::destroy() {
-        cleanupResources();
+        return imageViews;
     }
 
     vk::Extent2D SwapchainManager::getExtent() const {
         return swapchainExtent;
     }
 
-    void SwapchainManager::initSwapchainBuffers(const vk::RenderPass &renderPass) {
-        swapchainFramebuffers.resize(swapchainImageViews.size());
+    std::vector<vkr::Framebuffer> SwapchainManager::createFrameBuffers(const vkr::RenderPass &renderPass) {
+        std::vector<vkr::Framebuffer> buffers;
         for (size_t i = 0; i < swapchainImageViews.size(); i++) {
             vk::ImageView attachments[] = {
-                    swapchainImageViews[i],
+                    *swapchainImageViews[i],
             };
 
             vk::FramebufferCreateInfo framebufferCreateInfo{
                     // need the renderpass for the framebuffer to be created to be compatible with it
-                    .renderPass = renderPass,
+                    .renderPass = *renderPass,
                     .attachmentCount = 1,
                     .pAttachments = attachments,
                     .width = swapchainExtent.width,
@@ -142,24 +122,25 @@ namespace Rehnda {
                     .layers = 1,
             };
 
-            swapchainFramebuffers[i] = device.createFramebuffer(framebufferCreateInfo);
+            buffers.emplace_back(device, framebufferCreateInfo);
         }
+        return buffers;
     }
 
-    vk::Framebuffer &SwapchainManager::getSwapchainFramebuffer(size_t bufferIndex) {
+    vkr::Framebuffer &SwapchainManager::getSwapchainFramebuffer(size_t bufferIndex) {
         return swapchainFramebuffers[bufferIndex];
     }
 
-    vk::ResultValue<uint32_t> SwapchainManager::acquireNextImageIndex(vk::Semaphore &imageAvailableSemaphore) {
-        return device.acquireNextImageKHR(swapchain, UINT64_MAX, imageAvailableSemaphore);
+    std::pair<vk::Result, uint32_t> SwapchainManager::acquireNextImageIndex(vkr::Semaphore &imageAvailableSemaphore) {
+        return swapchain.acquireNextImage(UINT64_MAX, *imageAvailableSemaphore);
     }
 
-    PresentResult SwapchainManager::present(const std::vector<vk::Semaphore> &waitSemaphores, vk::Queue &presentQueue,
+    PresentResult SwapchainManager::present(const std::vector<vk::Semaphore> &waitSemaphores, vkr::Queue &presentQueue,
                                             uint32_t imageIndex) {
-        vk::SwapchainKHR swapChains[] = {swapchain};
+        vk::SwapchainKHR swapChains[] = {*swapchain};
         vk::PresentInfoKHR presentInfoKhr{
                 .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
-                .pWaitSemaphores = waitSemaphores.data(),
+                .pWaitSemaphores = reinterpret_cast<const vk::Semaphore *>(waitSemaphores.data()),
                 .swapchainCount = 1,
                 .pSwapchains = swapChains,
                 .pImageIndices = &imageIndex,
@@ -172,17 +153,13 @@ namespace Rehnda {
         return PresentResult::SUCCESS;
     }
 
-    SwapchainManager::~SwapchainManager() {
-        destroy();
-    }
-
     SwapChainSupportDetails::SwapChainSupportDetails(GLFWwindow *window,
-                                                     const vk::PhysicalDevice &physicalDevice,
-                                                     const vk::SurfaceKHR &surface) :
-            capabilities(physicalDevice.getSurfaceCapabilitiesKHR(surface)),
+                                                     const vkr::PhysicalDevice &physicalDevice,
+                                                     const vkr::SurfaceKHR &surface) :
+            capabilities(physicalDevice.getSurfaceCapabilitiesKHR(*surface)),
             window(window),
-            formats(physicalDevice.getSurfaceFormatsKHR(surface)),
-            presentModes(physicalDevice.getSurfacePresentModesKHR(surface)) {
+            formats(physicalDevice.getSurfaceFormatsKHR(*surface)),
+            presentModes(physicalDevice.getSurfacePresentModesKHR(*surface)) {
     }
 
     vk::SurfaceFormatKHR SwapChainSupportDetails::chooseSwapSurfaceFormat() const {

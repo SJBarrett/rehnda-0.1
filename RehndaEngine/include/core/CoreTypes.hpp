@@ -11,4 +11,7 @@ namespace Rehnda {
 
     template <class T, class = std::enable_if_t<std::is_pointer<T>::value>>
     using NonOwner = T;
+
+    template <class T>
+    using NonOwningPtr = T*;
 }

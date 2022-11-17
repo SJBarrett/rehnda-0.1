@@ -11,10 +11,10 @@
 
 namespace Rehnda {
     struct DeviceContext {
-        vk::Device &device;
-        vk::PhysicalDevice &physicalDevice;
-        vk::CommandPool &memoryCommandPool;
-        vk::Queue &graphicsQueue;
+        vkr::Device &device;
+        vkr::PhysicalDevice &physicalDevice;
+        vkr::CommandPool &memoryCommandPool;
+        vkr::Queue &graphicsQueue;
     };
 
     class RenderableMesh {
@@ -25,15 +25,11 @@ namespace Rehnda {
 
         RenderableMesh &operator=(const RenderableMesh &) = delete;
 
-        ~RenderableMesh();
-
-        void draw(vk::CommandBuffer &commandBuffer) const;
+        void draw(vkr::CommandBuffer &commandBuffer) const;
 
     private:
         StagedBuffer vertexBuffer;
         StagedBuffer indexBuffer;
         uint32_t indicesCount;
-
-        void destroy();
     };
 }

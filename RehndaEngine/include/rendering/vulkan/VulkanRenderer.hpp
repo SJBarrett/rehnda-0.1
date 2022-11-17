@@ -13,7 +13,6 @@ namespace Rehnda {
     class VulkanRenderer {
     public:
         explicit VulkanRenderer(GLFWwindow *window);
-        ~VulkanRenderer();
 
         void drawFrame();
 
@@ -28,30 +27,27 @@ namespace Rehnda {
         vkr::Instance instance;
         vkr::DebugUtilsMessengerEXT debugMessenger;
         vkr::SurfaceKHR surface;
-        vk::PhysicalDevice physicalDevice;
+        vkr::PhysicalDevice physicalDevice;
         QueueFamilyIndices queueFamilyIndices;
-        vk::Device device;
+        vkr::Device device;
 
         std::unique_ptr<FrameCoordinator> frameCoordinator;
-
-
-
 
         bool enableValidationLayers;
 
     private:
-        vk::PhysicalDevice pickPhysicalDevice();
+        vkr::PhysicalDevice pickPhysicalDevice();
 
-        vk::Device createDevice();
+        vkr::Device createDevice();
 
         vkr::SurfaceKHR createSurface();
         QueueFamilyIndices findQueueFamilies();
 
 
     private:
-        static int rateDeviceSuitability(GLFWwindow* window, const vk::PhysicalDevice &device, const vk::SurfaceKHR &surfaceKhr);
+        static int rateDeviceSuitability(GLFWwindow* window, const vkr::PhysicalDevice &device, const vkr::SurfaceKHR &surfaceKhr);
 
 
-        static bool areRequiredExtensionsSupported(const vk::PhysicalDevice &device, const std::vector<const char *>& requiredExtensions);
+        static bool areRequiredExtensionsSupported(const vkr::PhysicalDevice &device, const std::vector<const char *>& requiredExtensions);
     };
 }

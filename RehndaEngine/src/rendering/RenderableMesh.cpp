@@ -24,24 +24,14 @@ namespace Rehnda {
             indicesCount(indices.size()) {
     }
 
-    void RenderableMesh::draw(vk::CommandBuffer &commandBuffer) const {
-        vk::Buffer vertexBuffers[] = {vertexBuffer.getBuffer()};
+    void RenderableMesh::draw(vkr::CommandBuffer &commandBuffer) const {
+        vk::Buffer vertexBuffers[] = {*vertexBuffer.getBuffer()};
         vk::DeviceSize offsets[] = {0};
-        commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
+        commandBuffer.bindVertexBuffers(0, vertexBuffers, offsets);
 
-        commandBuffer.bindIndexBuffer(indexBuffer.getBuffer(), 0, vk::IndexType::eUint16);
+        commandBuffer.bindIndexBuffer(*indexBuffer.getBuffer(), 0, vk::IndexType::eUint16);
 
         // indices count, instance count
         commandBuffer.drawIndexed(indicesCount, 1, 0, 0, 0);
-    }
-
-    void RenderableMesh::destroy() {
-//        vertexBuffer.destroy();
-//        indexBuffer.destroy();
-    }
-
-    RenderableMesh::~RenderableMesh() {
-//        vertexBuffer.destroy();
-//        indexBuffer.destroy();
     }
 }

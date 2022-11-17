@@ -5,34 +5,31 @@
 #include "rendering/vulkan/BufferHelper.hpp"
 
 namespace Rehnda::BufferHelper {
-    void createBuffer(vk::Device& device, vk::PhysicalDevice& physicalDevice, const CreateBufferAndAssignMemoryProps& props, vk::Buffer& outBuffer, vk::DeviceMemory& outBufferMemory) {
-        vk::BufferCreateInfo bufferCreateInfo {
+    std::tuple<vkr::Buffer, vkr::DeviceMemory>
+    createBuffer(vkr::Device &device, vkr::PhysicalDevice &physicalDevice, const CreateBufferAndAssignMemoryProps &props) {
+        vk::BufferCreateInfo bufferCreateInfo{
                 .size = props.size,
                 .usage = props.bufferUsage,
                 // this buffer is only used by the graphics queue, so can be exclusive
                 .sharingMode = vk::SharingMode::eExclusive
         };
+        vkr::Buffer outBuffer{device, bufferCreateInfo};
 
-        // create the buffer, however the memory hasn't been assigned yet for the buffer
-        if (device.createBuffer(&bufferCreateInfo, nullptr, &outBuffer) != vk::Result::eSuccess) {
-            throw std::runtime_error("Failed to create buffer");
-        }
 
-        vk::MemoryRequirements memoryRequirements = device.getBufferMemoryRequirements(outBuffer);
+        vk::MemoryRequirements memoryRequirements = outBuffer.getMemoryRequirements();
 
-        vk::MemoryAllocateInfo memoryAllocateInfo {
+        vk::MemoryAllocateInfo memoryAllocateInfo{
                 .allocationSize = memoryRequirements.size,
                 .memoryTypeIndex = findMemoryType(physicalDevice, memoryRequirements.memoryTypeBits, props.requiredMemoryProperties)
         };
-
-        if (device.allocateMemory(&memoryAllocateInfo, nullptr, &outBufferMemory) != vk::Result::eSuccess) {
-            throw std::runtime_error("Failed to allocate vertex buffer memory");
-        }
+        vkr::DeviceMemory bufferMemory{device, memoryAllocateInfo};
         // associate the allocated memory with the previously created buffer
-        device.bindBufferMemory(outBuffer, outBufferMemory, 0);
+        outBuffer.bindMemory(*bufferMemory, 0);
+
+        return {std::move(outBuffer), std::move(bufferMemory)};
     }
 
-    uint32_t findMemoryType(vk::PhysicalDevice& physicalDevice, uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
+    uint32_t findMemoryType(vkr::PhysicalDevice &physicalDevice, uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
         vk::PhysicalDeviceMemoryProperties memoryProperties = physicalDevice.getMemoryProperties();
 
         for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {

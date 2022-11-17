@@ -22,13 +22,9 @@ namespace Rehnda {
 
     class FrameCoordinator {
     public:
-        FrameCoordinator(GLFWwindow *window, vk::Device &device, vk::PhysicalDevice &physicalDevice,
-                         vk::SurfaceKHR &surface,
+        FrameCoordinator(GLFWwindow *window, vkr::Device &device, vkr::PhysicalDevice &physicalDevice,
+                         vkr::SurfaceKHR &surface,
                          QueueFamilyIndices queueFamilyIndices);
-
-        ~FrameCoordinator();
-
-//        void destroy();
 
         DrawFrameResult drawFrame();
 
@@ -39,45 +35,46 @@ namespace Rehnda {
         size_t currentFrame = 0;
         bool framebufferResized = false;
 
-        vk::Device &device;
-        vk::PhysicalDevice &physicalDevice;
-        std::unique_ptr<SwapchainManager> swapchainManager;
+        vkr::Device &device;
+        vkr::PhysicalDevice &physicalDevice;
         QueueFamilyIndices queueFamilyIndices;
 
-        vk::Queue graphicsQueue;
-        vk::Queue presentQueue;
-        vk::CommandPool graphicsCommandPool;
-        vk::CommandPool memoryCommandPool;
-        std::vector<vk::CommandBuffer> commandBuffers;
+        vkr::Queue graphicsQueue;
+        vkr::Queue presentQueue;
+        vkr::CommandPool graphicsCommandPool;
+        vkr::CommandPool memoryCommandPool;
+        std::vector<vkr::CommandBuffer> commandBuffers;
 
-        std::vector<vk::Semaphore> imageAvailableSemaphores;
-        std::vector<vk::Semaphore> renderFinishedSemaphores;
-        std::vector<vk::Fence> inFlightFences;
+        std::vector<vkr::Semaphore> imageAvailableSemaphores;
+        std::vector<vkr::Semaphore> renderFinishedSemaphores;
+        std::vector<vkr::Fence> inFlightFences;
 
         // UBOs
         std::vector<WritableDirectBuffer> uboBuffers;
-        vk::DescriptorSetLayout descriptorSetLayout;
-        vk::DescriptorPool descriptorPool;
-        std::vector<vk::DescriptorSet> descriptorSets;
+        vkr::DescriptorSetLayout descriptorSetLayout;
+        vkr::DescriptorPool descriptorPool;
+        vkr::DescriptorSets descriptorSets;
 
+        std::unique_ptr<SwapchainManager> swapchainManager;
         std::unique_ptr<GraphicsPipeline> graphicsPipeline;
 
         // temp
         std::unique_ptr<RenderableMesh> mesh;
     private:
-        void initCommandPool();
+        vkr::CommandPool createCommandPool(vk::CommandPoolCreateFlags commandPoolCreateFlags);
 
-        void createSyncObjects();
+        std::vector<vkr::Semaphore> createSemaphores(size_t numToCreate);
+        std::vector<vkr::Fence> createFences(size_t numToCreate);
 
-        void createCommandBuffers();
+        vkr::CommandBuffers createCommandBuffers();
 
-        void createDescriptorSetLayout();
+        vkr::DescriptorSetLayout createDescriptorSetLayout();
 
-        void createUbos();
+        std::vector<WritableDirectBuffer> createUbos();
 
-        void createDescriptorPool();
+        vkr::DescriptorPool createDescriptorPool();
 
-        void createDescriptorSets();
+        vkr::DescriptorSets createDescriptorSets();
 
         void updateUniformBuffer(uint32_t currentImage);
     };

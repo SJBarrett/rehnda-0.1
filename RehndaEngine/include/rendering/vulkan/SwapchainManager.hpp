@@ -15,8 +15,8 @@
 namespace Rehnda {
     class SwapChainSupportDetails {
     public:
-        SwapChainSupportDetails(GLFWwindow *window, const vk::PhysicalDevice &physicalDevice,
-                                const vk::SurfaceKHR &surface);
+        SwapChainSupportDetails(GLFWwindow *window, const vkr::PhysicalDevice &physicalDevice,
+                                const vkr::SurfaceKHR &surface);
 
         [[nodiscard]]
         vk::SurfaceFormatKHR chooseSwapSurfaceFormat() const;
@@ -41,49 +41,42 @@ namespace Rehnda {
 
     class SwapchainManager {
     public:
-        SwapchainManager(vk::Device &device,
-                         const vk::SurfaceKHR &surface, QueueFamilyIndices, const vk::RenderPass &renderPass,
+        SwapchainManager(vkr::Device &device,
+                         const vkr::SurfaceKHR &surface, QueueFamilyIndices, const vkr::RenderPass &renderPass,
                          const SwapChainSupportDetails &swapChainSupportDetails);
 
-        ~SwapchainManager();
+        void resize(const vkr::RenderPass &renderPass);
 
-        void resize(const vk::RenderPass &renderPass);
-
-        vk::ResultValue<uint32_t> acquireNextImageIndex(vk::Semaphore &imageAvailableSemaphore);
+        std::pair<vk::Result, uint32_t> acquireNextImageIndex(vkr::Semaphore &imageAvailableSemaphore);
 
         PresentResult
-        present(const std::vector<vk::Semaphore> &waitSemaphores, vk::Queue &presentQueue, uint32_t imageIndex);
+        present(const std::vector<vk::Semaphore> &waitSemaphores, vkr::Queue &presentQueue, uint32_t imageIndex);
 
         [[nodiscard]]
         vk::Extent2D getExtent() const;
 
         [[nodiscard]]
-        vk::Framebuffer &getSwapchainFramebuffer(size_t bufferIndex);
+        vkr::Framebuffer &getSwapchainFramebuffer(size_t bufferIndex);
 
 
     private:
-        vk::Device &device;
-        const vk::SurfaceKHR &surface;
+        vkr::Device &device;
+        const vkr::SurfaceKHR &surface;
         const QueueFamilyIndices queueFamilyIndices;
         const SwapChainSupportDetails &swapChainSupportDetails;
 
-        vk::SwapchainKHR swapchain;
-        vk::Format swapchainImageFormat;
+        vk::SurfaceFormatKHR swapchainSurfaceFormat;
         vk::Extent2D swapchainExtent;
-        std::vector<vk::Image> swapchainImages;
-        std::vector<vk::ImageView> swapchainImageViews;
-        std::vector<vk::Framebuffer> swapchainFramebuffers;
+        vkr::SwapchainKHR swapchain;
+        std::vector<vkr::ImageView> swapchainImageViews;
+        std::vector<vkr::Framebuffer> swapchainFramebuffers;
 
 
     private:
-        void cleanupResources();
+        std::vector<vkr::ImageView> createImageViews();
 
-        void createImageViews();
+        vkr::SwapchainKHR createSwapchain();
 
-        void createSwapchain();
-
-        void initSwapchainBuffers(const vk::RenderPass &renderPass);
-
-        void destroy();
+        std::vector<vkr::Framebuffer> createFrameBuffers(const vkr::RenderPass &renderPass);
     };
 }
