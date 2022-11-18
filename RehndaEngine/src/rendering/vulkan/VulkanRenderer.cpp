@@ -31,7 +31,6 @@ namespace Rehnda {
             physicalDevice(pickPhysicalDevice()),
             queueFamilyIndices(findQueueFamilies()),
             device(createDevice()) {
-        createDevice();
         frameCoordinator = std::make_unique<FrameCoordinator>(window, device, physicalDevice, surface, queueFamilyIndices);
     }
 

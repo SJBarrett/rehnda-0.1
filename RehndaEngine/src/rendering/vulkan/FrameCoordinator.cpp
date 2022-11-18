@@ -16,6 +16,7 @@
 #include "rendering/vulkan/VkDebugHelpers.hpp"
 #include "rendering/vulkan/SwapchainManager.hpp"
 #include "rendering/MVPTransforms.hpp"
+#include "rendering/vulkan/TextureImage.hpp"
 
 namespace Rehnda {
     const std::vector<Vertex> vertices = {
@@ -76,6 +77,8 @@ namespace Rehnda {
             };
             device.updateDescriptorSets(descriptorWrite, nullptr);
         }
+
+        TextureImage textureImage{device, physicalDevice, graphicsQueue, memoryCommandPool, "resources/textures/texture.jpg"};
     }
 
     vkr::CommandPool FrameCoordinator::createCommandPool(vk::CommandPoolCreateFlags commandPoolCreateFlags) {
