@@ -13,11 +13,12 @@ namespace Rehnda {
     struct Vertex {
         glm::vec2 pos;
         glm::vec3 color;
+        glm::vec2 texCoord;
 
         // describing the chunk as a single unit of data
         static vk::VertexInputBindingDescription getBindingDescription();
 
         // describing what's inside a vertex
-        static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions();
+        static std::array<vk::VertexInputAttributeDescription, 3> getAttributeDescriptions();
     };
 }

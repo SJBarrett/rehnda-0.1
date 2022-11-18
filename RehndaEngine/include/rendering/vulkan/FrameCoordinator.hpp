@@ -12,6 +12,8 @@
 #include "VkTypes.hpp"
 #include "SwapchainManager.hpp"
 #include "GraphicsPipeline.hpp"
+#include "TextureImage.hpp"
+#include "TextureSampler.hpp"
 
 
 namespace Rehnda {
@@ -60,6 +62,8 @@ namespace Rehnda {
 
         // temp
         std::unique_ptr<RenderableMesh> mesh;
+        std::unique_ptr<TextureImage> textureImage;
+        std::unique_ptr<TextureSampler> textureSampler;
     private:
         vkr::CommandPool createCommandPool(vk::CommandPoolCreateFlags commandPoolCreateFlags);
 

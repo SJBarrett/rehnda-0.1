@@ -12,14 +12,14 @@
 
 namespace Rehnda {
 
-    TextureImage::TextureImage(vkr::Device &device, vkr::PhysicalDevice &physicalDevice, vkr::Queue& queue, vkr::CommandPool &commandPool, const std::filesystem::path &pathToTexture) {
-        int texWidth, texHeight, texChannels;
-        stbi_uc *pixels = stbi_load(pathToTexture.string().c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-        vk::DeviceSize imageSize = texWidth * texHeight * 4;
-
-        if (!pixels) {
-            throw std::runtime_error("Failed to load texture image!");
-        }
+    TextureImage::TextureImage(vkr::Device &device, vkr::PhysicalDevice &physicalDevice, vkr::Queue &queue, vkr::CommandPool &commandPool,
+                               const std::filesystem::path &pathToTexture) :
+            device(device),
+            physicalDevice(physicalDevice),
+            pixelData(loadImage(pathToTexture)),
+            textureImage(createTextureImage()),
+            textureImageMemory(createDeviceMemory()),
+            textureImageView(createImageView()){
         BufferHelper::CreateBufferAndAssignMemoryProps stagingBufferProps{
                 .size = imageSize,
                 .bufferUsage = vk::BufferUsageFlagBits::eTransferSrc,
@@ -31,44 +31,23 @@ namespace Rehnda {
                 physicalDevice,
                 stagingBufferProps
         );
+
         void *data = stagingBufferMemory.mapMemory(0, imageSize);
-        memcpy(data, pixels, static_cast<size_t>(imageSize));
+        memcpy(data, pixelData, static_cast<size_t>(imageSize));
         stagingBufferMemory.unmapMemory();
-        stbi_image_free(pixels);
+        stbi_image_free(pixelData);
 
-        vk::ImageCreateInfo imageCreateInfo{
-                .imageType = vk::ImageType::e2D,
-                .format = vk::Format::eR8G8B8A8Srgb,
-                .extent = {
-                        .width = static_cast<uint32_t>(texWidth),
-                        .height = static_cast<uint32_t>(texHeight),
-                        .depth = 1,
-                },
-                .mipLevels = 1,
-                .arrayLayers = 1,
-                .samples = vk::SampleCountFlagBits::e1,
-                .tiling = vk::ImageTiling::eOptimal,
-                .usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-                .sharingMode = vk::SharingMode::eExclusive,
-                .initialLayout = vk::ImageLayout::eUndefined,
-        };
-        vkr::Image image{device, imageCreateInfo};
-        vk::MemoryRequirements imageMemoryRequirements = image.getMemoryRequirements();
+        // Wait for image to be ready to transfer to, starting state doesn't matter
+        transitionImageLayout(queue, commandPool, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+        // copy to the image from the staging buffer now that the destination is ready
+        copyBufferToImage(stagingBuffer, queue, commandPool);
+        // Wait for image to be ready to be read in a fragment shader
+        transitionImageLayout(queue, commandPool, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+    }
 
-        vk::MemoryAllocateInfo memoryAllocateInfo{
-            .allocationSize = imageSize,
-            .memoryTypeIndex = BufferHelper::findMemoryType(physicalDevice, imageMemoryRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal)
-        };
-        vkr::DeviceMemory memory{device, memoryAllocateInfo};
-        image.bindMemory(*memory, 0);
-
-
-        transitionImageLayout(device, queue, commandPool, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, image);
-
-        {
-            // TODO split into helper function
-            SingleTimeCommand singleTimeCommand{device, queue, commandPool};
-            vk::BufferImageCopy region{
+    void TextureImage::copyBufferToImage(vkr::Buffer &stagingBuffer, vkr::Queue &queue, vkr::CommandPool &commandPool) const {
+        SingleTimeCommand singleTimeCommand{device, queue, commandPool};
+        vk::BufferImageCopy region{
                 .bufferOffset = 0,
                 .bufferRowLength = 0,
                 .bufferImageHeight = 0,
@@ -80,19 +59,17 @@ namespace Rehnda {
                 },
                 .imageOffset = {0, 0, 0},
                 .imageExtent = {
-                        .width = static_cast<uint32_t>(texWidth),
-                        .height = static_cast<uint32_t>(texHeight),
+                        .width = textureWidth,
+                        .height = textureHeight,
                         .depth = 1,
                 }
-            };
-            singleTimeCommand.commandBuffer.copyBufferToImage(*stagingBuffer, *image, vk::ImageLayout::eTransferDstOptimal, region);
-        }
-
-        transitionImageLayout(device, queue, commandPool, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, image);
+        };
+        singleTimeCommand.commandBuffer.copyBufferToImage(*stagingBuffer, *textureImage, vk::ImageLayout::eTransferDstOptimal, region);
     }
 
     void
-    TextureImage::transitionImageLayout(vkr::Device &device, vkr::Queue &queue, vkr::CommandPool &commandPool, vk::ImageLayout oldLayout, vk::ImageLayout newLayout, vkr::Image &image) const {
+    TextureImage::transitionImageLayout(vkr::Queue &queue, vkr::CommandPool &commandPool, vk::ImageLayout oldLayout,
+                                        vk::ImageLayout newLayout) const {
         SingleTimeCommand singleTimeCommand{device, queue, commandPool};
         vk::AccessFlags srcAccessMask;
         vk::AccessFlags dstAccessMask;
@@ -118,7 +95,7 @@ namespace Rehnda {
                 .newLayout = newLayout,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = *image,
+                .image = *textureImage,
                 .subresourceRange = {
                         .aspectMask = vk::ImageAspectFlagBits::eColor,
                         .baseMipLevel = 0,
@@ -127,6 +104,73 @@ namespace Rehnda {
                         .layerCount = 1
                 }
         };
-        singleTimeCommand.commandBuffer.pipelineBarrier(sourceStage, destStage, vk::DependencyFlags{}, nullptr, nullptr, imageMemoryBarrier);
+        singleTimeCommand.commandBuffer.pipelineBarrier(sourceStage, destStage, vk::DependencyFlags{}, nullptr, nullptr,
+                                                        imageMemoryBarrier);
+    }
+
+    vkr::Image TextureImage::createTextureImage() {
+        vk::ImageCreateInfo imageCreateInfo{
+                .imageType = vk::ImageType::e2D,
+                .format = vk::Format::eR8G8B8A8Srgb,
+                .extent = {
+                        .width = static_cast<uint32_t>(textureWidth),
+                        .height = static_cast<uint32_t>(textureHeight),
+                        .depth = 1,
+                },
+                .mipLevels = 1,
+                .arrayLayers = 1,
+                .samples = vk::SampleCountFlagBits::e1,
+                .tiling = vk::ImageTiling::eOptimal,
+                .usage = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+                .sharingMode = vk::SharingMode::eExclusive,
+                .initialLayout = vk::ImageLayout::eUndefined,
+        };
+        return {device, imageCreateInfo};
+    }
+
+    vkr::ImageView TextureImage::createImageView() {
+        vk::ImageViewCreateInfo imageViewCreateInfo{
+                .image = *textureImage,
+                .viewType = vk::ImageViewType::e2D,
+                .format = vk::Format::eR8G8B8A8Srgb,
+                .subresourceRange = {
+                        .aspectMask = vk::ImageAspectFlagBits::eColor,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1,
+                }
+        };
+        return {device, imageViewCreateInfo};
+    }
+
+    void *TextureImage::loadImage(const std::filesystem::path &pathToTexture) {
+        int texWidth, texHeight, texChannels;
+        stbi_uc *pixels = stbi_load(pathToTexture.string().c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        textureWidth = static_cast<uint32_t>(texWidth);
+        textureHeight = static_cast<uint32_t>(texHeight);
+        numChannels = 4;
+        imageSize = textureWidth * textureHeight * numChannels;
+        if (!pixels) {
+            throw std::runtime_error("Failed to load texture image!");
+        }
+        return pixels;
+    }
+
+    vkr::DeviceMemory TextureImage::createDeviceMemory() {
+        vk::MemoryRequirements imageMemoryRequirements = textureImage.getMemoryRequirements();
+
+        vk::MemoryAllocateInfo memoryAllocateInfo{
+                .allocationSize = imageSize,
+                .memoryTypeIndex = BufferHelper::findMemoryType(physicalDevice, imageMemoryRequirements.memoryTypeBits,
+                                                                vk::MemoryPropertyFlagBits::eDeviceLocal)
+        };
+        vkr::DeviceMemory memory{device, memoryAllocateInfo};
+        textureImage.bindMemory(*memory, 0);
+        return memory;
+    }
+
+    vkr::ImageView &TextureImage::getImageView() {
+        return textureImageView;
     }
 } // Rehnda

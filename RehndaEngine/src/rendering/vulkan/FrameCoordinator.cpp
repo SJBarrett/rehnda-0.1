@@ -17,13 +17,14 @@
 #include "rendering/vulkan/SwapchainManager.hpp"
 #include "rendering/MVPTransforms.hpp"
 #include "rendering/vulkan/TextureImage.hpp"
+#include "rendering/vulkan/TextureSampler.hpp"
 
 namespace Rehnda {
     const std::vector<Vertex> vertices = {
-            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-            {{0.5f,  -0.5f}, {0.0f, 1.0f, 0.0f}},
-            {{0.5f,  0.5f},  {0.0f, 0.0f, 1.0f}},
-            {{-0.5f, 0.5f},  {1.0f, 1.0f, 1.0f}}
+            {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+            {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+            {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+            {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
     };
     const std::vector<uint16_t> indices = {
             0, 1, 2, 2, 3, 0
@@ -58,14 +59,19 @@ namespace Rehnda {
         swapchainManager = std::make_unique<SwapchainManager>(device, surface, queueFamilyIndices,
                                                               graphicsPipeline->getRenderPass(),
                                                               swapChainSupportDetails);
-
+        textureImage = std::make_unique<TextureImage>(device, physicalDevice, graphicsQueue, memoryCommandPool, "resources/textures/texture.jpg");
+        textureSampler = std::make_unique<TextureSampler>(device, physicalDevice, TextureSamplerProps{
+                .magMinFilter = vk::Filter::eLinear,
+                .samplerAddressModeUVW = vk::SamplerAddressMode::eRepeat,
+        });
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vk::DescriptorBufferInfo bufferInfo{
                     .buffer = *uboBuffers[i].getBuffer(),
                     .offset = 0,
                     .range = sizeof(MVPTransforms)
             };
-            vk::WriteDescriptorSet descriptorWrite{
+
+            vk::WriteDescriptorSet bufferDescriptorWrite{
                     .dstSet = *descriptorSets[i],
                     .dstBinding = 0,
                     .dstArrayElement = 0,
@@ -75,10 +81,26 @@ namespace Rehnda {
                     .pBufferInfo = &bufferInfo,
                     .pTexelBufferView = nullptr
             };
-            device.updateDescriptorSets(descriptorWrite, nullptr);
+
+            vk::DescriptorImageInfo imageInfo{
+                    .sampler = **textureSampler,
+                    .imageView = *textureImage->getImageView(),
+                    .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
+            };
+            vk::WriteDescriptorSet imageDescriptorWrite{
+                    .dstSet = *descriptorSets[i],
+                    .dstBinding = 1,
+                    .dstArrayElement = 0,
+                    .descriptorCount = 1,
+                    .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                    .pImageInfo = &imageInfo,
+                    .pBufferInfo = nullptr,
+                    .pTexelBufferView = nullptr
+            };
+            device.updateDescriptorSets({bufferDescriptorWrite, imageDescriptorWrite}, nullptr);
         }
 
-        TextureImage textureImage{device, physicalDevice, graphicsQueue, memoryCommandPool, "resources/textures/texture.jpg"};
+
     }
 
     vkr::CommandPool FrameCoordinator::createCommandPool(vk::CommandPoolCreateFlags commandPoolCreateFlags) {
@@ -167,9 +189,22 @@ namespace Rehnda {
                 .pImmutableSamplers = nullptr
         };
 
+        vk::DescriptorSetLayoutBinding samplerLayoutBinding{
+                .binding = 1,
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .descriptorCount = 1,
+                .stageFlags = vk::ShaderStageFlagBits::eFragment,
+                .pImmutableSamplers = nullptr,
+        };
+
+        std::array<vk::DescriptorSetLayoutBinding, 2> bindings = {
+                uboLayoutBinding,
+                samplerLayoutBinding,
+        };
+
         vk::DescriptorSetLayoutCreateInfo layoutCreateInfo{
-                .bindingCount = 1,
-                .pBindings = &uboLayoutBinding
+                .bindingCount = static_cast<uint32_t>(bindings.size()),
+                .pBindings = bindings.data()
         };
         return {device, layoutCreateInfo};
     }
@@ -212,14 +247,21 @@ namespace Rehnda {
     }
 
     vkr::DescriptorPool FrameCoordinator::createDescriptorPool() {
-        vk::DescriptorPoolSize poolSize{
-                .descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
+        std::array<vk::DescriptorPoolSize, 2> poolSizes{
+                vk::DescriptorPoolSize{
+                        .type = vk::DescriptorType::eUniformBuffer,
+                        .descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
+                },
+                vk::DescriptorPoolSize{
+                        .type = vk::DescriptorType::eCombinedImageSampler,
+                        .descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
+                },
         };
         vk::DescriptorPoolCreateInfo poolCreateInfo{
                 .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
                 .maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
-                .poolSizeCount = 1,
-                .pPoolSizes = &poolSize
+                .poolSizeCount = poolSizes.size(),
+                .pPoolSizes = poolSizes.data()
         };
         return {device, poolCreateInfo};
     }

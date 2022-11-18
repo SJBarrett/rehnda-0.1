@@ -87,6 +87,9 @@ namespace Rehnda {
         if (swapChainSupportDetails.formats.empty() || swapChainSupportDetails.presentModes.empty()) {
             return 0;
         }
+        if (!deviceFeatures.samplerAnisotropy) {
+            return 0;
+        }
 
         return score;
     }
@@ -145,7 +148,9 @@ namespace Rehnda {
             queueCreateInfos.push_back(queueCreateInfo);
         }
 
-        vk::PhysicalDeviceFeatures physicalDeviceFeatures;
+        vk::PhysicalDeviceFeatures physicalDeviceFeatures{
+            .samplerAnisotropy = true,
+        };
 
         vk::DeviceCreateInfo deviceCreateInfo{
                 .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
