@@ -60,7 +60,7 @@ namespace Rehnda {
         std::unique_ptr<SwapchainManager> swapchainManager;
         std::unique_ptr<GraphicsPipeline> graphicsPipeline;
 
-        // temp
+        // tempsdf
         std::unique_ptr<RenderableMesh> mesh;
         std::unique_ptr<TextureImage> textureImage;
         std::unique_ptr<TextureSampler> textureSampler;

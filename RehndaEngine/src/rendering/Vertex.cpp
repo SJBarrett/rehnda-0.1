@@ -18,7 +18,7 @@ namespace Rehnda {
         attributeDescriptions[0] = {
                 .location = 0,
                 .binding = 0,
-                .format = vk::Format::eR32G32Sfloat, // 2 float values
+                .format = vk::Format::eR32G32B32Sfloat, // 3 float values
                 .offset = offsetof(Vertex, pos)
         };
 

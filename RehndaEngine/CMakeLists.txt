@@ -48,10 +48,15 @@ set(SOURCE_FILES
         src/rendering/vulkan/StagedBuffer.cpp
         src/rendering/vulkan/WritableDirectBuffer.cpp
         src/rendering/vulkan/VulkanRenderer.cpp
+        src/rendering/vulkan/SingleTimeCommand.cpp
+        src/rendering/vulkan/TextureSampler.cpp
+        src/rendering/vulkan/Image.cpp
+        src/rendering/vulkan/TextureImage.cpp
+        src/rendering/vulkan/DepthImage.cpp
         src/core/FileUtils.cpp
         src/rendering/Vertex.cpp
         src/rendering/RenderableMesh.cpp
-        src/rendering/vulkan/TextureImage.cpp include/rendering/vulkan/TextureImage.hpp src/rendering/vulkan/SingleTimeCommand.cpp include/rendering/vulkan/SingleTimeCommand.hpp src/rendering/vulkan/TextureSampler.cpp include/rendering/vulkan/TextureSampler.hpp)
+        )
 
 add_executable(${ENGINE_TARGET_NAME} ${SOURCE_FILES})
 set_property(TARGET ${ENGINE_TARGET_NAME} PROPERTY CXX_STANDARD 20)

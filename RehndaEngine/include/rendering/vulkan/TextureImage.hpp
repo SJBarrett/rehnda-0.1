@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include "rendering/vulkan/VkTypes.hpp"
+#include "Image.hpp"
 
 namespace Rehnda {
 
@@ -17,7 +18,6 @@ namespace Rehnda {
 
     private:
         vkr::Device& device;
-        vkr::PhysicalDevice& physicalDevice;
 
         void* pixelData;
         uint32_t textureWidth;
@@ -25,16 +25,9 @@ namespace Rehnda {
         uint32_t numChannels;
         vk::DeviceSize imageSize;
 
-        vkr::Image textureImage;
-        vkr::DeviceMemory textureImageMemory;
-        vkr::ImageView textureImageView;
+        Image image;
 
         void* loadImage(const std::filesystem::path &pathToTexture);
-        vkr::Image createTextureImage();
-        vkr::DeviceMemory createDeviceMemory();
-        vkr::ImageView createImageView();
-
-        void transitionImageLayout(vkr::Queue &queue, vkr::CommandPool &commandPool, vk::ImageLayout oldLayout, vk::ImageLayout newLayout) const;
 
         void copyBufferToImage(vkr::Buffer& stagingBuffer, vkr::Queue &queue, vkr::CommandPool &commandPool) const;
     };
