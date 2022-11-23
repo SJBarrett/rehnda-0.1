@@ -5,7 +5,6 @@
 #pragma once
 
 
-
 #include "rendering/vulkan/VkTypes.hpp"
 #include "core/CoreTypes.hpp"
 #include "SwapchainManager.hpp"
@@ -16,17 +15,19 @@
 namespace Rehnda {
     class GraphicsPipeline {
     public:
-        explicit GraphicsPipeline(vkr::Device &device, vk::Format imageFormat, RenderableMesh &renderableMesh,
+        explicit GraphicsPipeline(vkr::Device &device, vkr::PhysicalDevice &physicalDevice, vk::Format imageFormat,
+                                  RenderableMesh &renderableMesh,
                                   vkr::DescriptorSetLayout &descriptorSetLayout);
 
         void recordCommandBuffer(vkr::CommandBuffer &commandBuffer, vkr::Framebuffer &targetFramebuffer,
                                  vkr::DescriptorSet &currentDescriptorSet, vk::Extent2D extent);
 
         [[nodiscard]]
-        const vkr::RenderPass& getRenderPass() const;
+        const vkr::RenderPass &getRenderPass() const;
 
     private:
         vkr::Device &device;
+        vkr::PhysicalDevice &physicalDevice;
 
         vkr::RenderPass renderPass;
         vkr::PipelineLayout pipelineLayout;
@@ -39,7 +40,9 @@ namespace Rehnda {
         vkr::ShaderModule createShaderModule(const std::vector<char> &code);
 
         vkr::RenderPass createRenderPass(vk::Format imageFormat);
+
         vkr::PipelineLayout createPipelineLayout(vkr::DescriptorSetLayout &descriptorSetLayout);
+
         vkr::Pipeline createPipeline();
     };
 }

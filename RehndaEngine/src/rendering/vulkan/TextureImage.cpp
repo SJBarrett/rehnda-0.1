@@ -20,11 +20,11 @@ namespace Rehnda {
             image(device, physicalDevice, ImageProps{
                     .width = textureWidth,
                     .height = textureHeight,
-                    .size = imageSize,
                     .format = vk::Format::eR8G8B8A8Srgb,
                     .tiling = vk::ImageTiling::eOptimal,
                     .imageUsageFlags = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-                    .memoryPropertyFlags = vk::MemoryPropertyFlagBits::eDeviceLocal
+                    .memoryPropertyFlags = vk::MemoryPropertyFlagBits::eDeviceLocal,
+                    .imageAspectFlags = vk::ImageAspectFlagBits::eColor,
             }) {
         BufferHelper::CreateBufferAndAssignMemoryProps stagingBufferProps{
                 .size = imageSize,
@@ -86,7 +86,7 @@ namespace Rehnda {
         return pixels;
     }
 
-    vkr::ImageView &TextureImage::getImageView() {
+    const vkr::ImageView &TextureImage::getImageView() const {
         return image.getImageView();
     }
 } // Rehnda

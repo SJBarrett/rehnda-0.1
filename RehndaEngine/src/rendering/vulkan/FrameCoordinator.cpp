@@ -43,6 +43,7 @@ namespace Rehnda {
             device(device),
             physicalDevice(physicalDevice),
             queueFamilyIndices(queueFamilyIndices),
+            swapChainSupportDetails(window, physicalDevice, surface),
             graphicsQueue(device.getQueue(queueFamilyIndices.graphicsQueueIndex.value(), 0)),
             presentQueue(device.getQueue(queueFamilyIndices.presentQueueIndex.value(), 0)),
             graphicsCommandPool(createCommandPool(vk::CommandPoolCreateFlagBits::eResetCommandBuffer)),
@@ -59,12 +60,14 @@ namespace Rehnda {
         mesh = std::make_unique<RenderableMesh>(
                 DeviceContext{.device = device, .physicalDevice=physicalDevice, .memoryCommandPool = memoryCommandPool, .graphicsQueue=graphicsQueue},
                 vertices, indices);
-        SwapChainSupportDetails swapChainSupportDetails(window, physicalDevice, surface);
-        graphicsPipeline = std::make_unique<GraphicsPipeline>(device,
+        graphicsPipeline = std::make_unique<GraphicsPipeline>(device, physicalDevice,
                                                               swapChainSupportDetails.chooseSwapSurfaceFormat().format,
                                                               *mesh, descriptorSetLayout);
+        depthImage = std::make_unique<DepthImage>(device, physicalDevice, swapChainSupportDetails.chooseSwapExtent());
+
         swapchainManager = std::make_unique<SwapchainManager>(device, surface, queueFamilyIndices,
                                                               graphicsPipeline->getRenderPass(),
+                                                              depthImage->getImageView(),
                                                               swapChainSupportDetails);
         textureImage = std::make_unique<TextureImage>(device, physicalDevice, graphicsQueue, memoryCommandPool, "resources/textures/texture.jpg");
         textureSampler = std::make_unique<TextureSampler>(device, physicalDevice, TextureSamplerProps{
@@ -145,7 +148,8 @@ namespace Rehnda {
                 imageAvailableSemaphores[currentFrame]);
         if (result == vk::Result::eErrorOutOfDateKHR || framebufferResized) {
             framebufferResized = false;
-            swapchainManager->resize(graphicsPipeline->getRenderPass());
+            depthImage->resize(device, physicalDevice, swapChainSupportDetails.chooseSwapExtent());
+            swapchainManager->resize(graphicsPipeline->getRenderPass(), depthImage->getImageView());
             return DrawFrameResult::SWAPCHAIN_OUT_OF_DATE;
         } else if (result != vk::Result::eSuccess &&
                    result != vk::Result::eSuboptimalKHR) {

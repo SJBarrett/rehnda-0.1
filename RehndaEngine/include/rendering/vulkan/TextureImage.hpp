@@ -14,7 +14,8 @@ namespace Rehnda {
     public:
         TextureImage(vkr::Device& device, vkr::PhysicalDevice &physicalDevice, vkr::Queue& queue, vkr::CommandPool &commandPool, const std::filesystem::path& pathToTexture);
 
-        vkr::ImageView &getImageView();
+        [[nodiscard]]
+        const vkr::ImageView &getImageView() const;
 
     private:
         vkr::Device& device;

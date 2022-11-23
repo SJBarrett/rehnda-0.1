@@ -5,6 +5,7 @@
 #include "rendering/vulkan/GraphicsPipeline.hpp"
 #include "core/FileUtils.hpp"
 #include "rendering/Vertex.hpp"
+#include "rendering/vulkan/DepthImage.hpp"
 
 namespace Rehnda {
 
@@ -18,9 +19,10 @@ namespace Rehnda {
      * @param device
      * @param swapchainManager
      */
-    GraphicsPipeline::GraphicsPipeline(vkr::Device &device, vk::Format imageFormat, RenderableMesh &renderableMesh,
+    GraphicsPipeline::GraphicsPipeline(vkr::Device &device, vkr::PhysicalDevice& physicalDevice, vk::Format imageFormat, RenderableMesh &renderableMesh,
                                        vkr::DescriptorSetLayout &descriptorSetLayout) :
             device(device),
+            physicalDevice(physicalDevice),
             renderPass(createRenderPass(imageFormat)),
             pipelineLayout(createPipelineLayout(descriptorSetLayout)),
             pipeline(createPipeline()),
@@ -124,6 +126,19 @@ namespace Rehnda {
                 .pAttachments = &colorBlendAttachmentState,
         };
 
+        vk::PipelineDepthStencilStateCreateInfo depthStencilStateCreateInfo{
+            .depthTestEnable = true,
+            .depthWriteEnable = true,
+            .depthCompareOp = vk::CompareOp::eLess,
+            // depth bounds can be used to only keep fragments in a certain range
+            .depthBoundsTestEnable = false,
+            .stencilTestEnable = false,
+            .front = {},
+            .back = {},
+            .minDepthBounds = 0.f,
+            .maxDepthBounds = 1.f,
+        };
+
         vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo{
                 // --- SHADER STAGE DESCRIPTIONS ---
                 .stageCount = 2,
@@ -134,7 +149,7 @@ namespace Rehnda {
                 .pViewportState = &viewportState,
                 .pRasterizationState = &rasterizer,
                 .pMultisampleState = &multisampling,
-                .pDepthStencilState = nullptr,
+                .pDepthStencilState = &depthStencilStateCreateInfo,
                 .pColorBlendState = &colorBlending,
                 .pDynamicState = &dynamicStateCreateInfo,
                 // --- PIPELINE LAYOUT ---
@@ -176,26 +191,46 @@ namespace Rehnda {
                 .layout = vk::ImageLayout::eColorAttachmentOptimal,
         };
 
+        vk::AttachmentDescription depthAttachment{
+                .format = DepthImage::findDepthFormat(physicalDevice),
+                .samples = vk::SampleCountFlagBits::e1,
+                .loadOp = vk::AttachmentLoadOp::eClear,
+                .storeOp = vk::AttachmentStoreOp::eDontCare,
+                .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+                .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+                // since we are clearing at the start, the initial layout doesn't matter
+                .initialLayout = vk::ImageLayout::eUndefined,
+                // since we are rendering to the swapchainManager we use PresentSrcKHR
+                .finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+        };
+        vk::AttachmentReference depthAttachmentRef{
+            .attachment = 1,
+            .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal
+        };
+
         vk::SubpassDescription subpass{
                 .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
                 .colorAttachmentCount = 1,
-                // the index of the attachment in the below array is what is referened in the shader (e.g. "layout(location = 0) out vec4 outColor;")
+                // the index of the attachment in the below array is what is referenced in the shader (e.g. "layout(location = 0) out vec4 outColor;")
                 .pColorAttachments = &colorAttachmentRef,
+                .pDepthStencilAttachment = &depthAttachmentRef,
         };
 
         vk::SubpassDependency subpassDependency{
                 .srcSubpass = VK_SUBPASS_EXTERNAL, // this refers to the implicit subpass before the render pass
                 .dstSubpass = 0, // this refers to our subpass, the first and only one
                 // we need to wait for the swap chain to finish reading from the image before we access it
-                .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                // and ensure the depth image is cleared before we try use it
+                .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
+                .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
                 .srcAccessMask = vk::AccessFlagBits::eNone,
-                .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
+                .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
         };
 
+        std::array<vk::AttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
         vk::RenderPassCreateInfo renderPassCreateInfo{
-                .attachmentCount = 1,
-                .pAttachments = &colorAttachment,
+                .attachmentCount = attachments.size(),
+                .pAttachments = attachments.data(),
                 .subpassCount = 1,
                 .pSubpasses = &subpass,
                 .dependencyCount = 1,
@@ -211,10 +246,10 @@ namespace Rehnda {
         vk::CommandBufferBeginInfo beginInfo{};
         commandBuffer.begin(beginInfo); // this implicitly resets the buffer
 
-        vk::ClearValue clearColor{
-                .color = {
-                        .float32 = {{0.0f, 0.f, 0.f, 1.f}}
-                }
+        std::array<vk::ClearValue, 2> clearColors{
+                vk::ClearValue{.color={.float32 = {{0.f, 0.f, 0.f, 1.f}}}},
+                // clear depth buffer to be equal to the farthest view plane (1.0)
+                vk::ClearValue{.depthStencil={.depth=1.0, .stencil=0}}
         };
 
         vk::RenderPassBeginInfo renderPassBeginInfo{
@@ -224,8 +259,8 @@ namespace Rehnda {
                         .offset = {0, 0},
                         .extent = extent,
                 },
-                .clearValueCount = 1,
-                .pClearValues = &clearColor,
+                .clearValueCount = clearColors.size(),
+                .pClearValues = clearColors.data(),
         };
 
         commandBuffer.beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);

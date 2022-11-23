@@ -14,6 +14,7 @@
 #include "GraphicsPipeline.hpp"
 #include "TextureImage.hpp"
 #include "TextureSampler.hpp"
+#include "DepthImage.hpp"
 
 
 namespace Rehnda {
@@ -40,6 +41,7 @@ namespace Rehnda {
         vkr::Device &device;
         vkr::PhysicalDevice &physicalDevice;
         QueueFamilyIndices queueFamilyIndices;
+        SwapChainSupportDetails swapChainSupportDetails;
 
         vkr::Queue graphicsQueue;
         vkr::Queue presentQueue;
@@ -61,6 +63,7 @@ namespace Rehnda {
         std::unique_ptr<GraphicsPipeline> graphicsPipeline;
 
         // tempsdf
+        std::unique_ptr<DepthImage> depthImage;
         std::unique_ptr<RenderableMesh> mesh;
         std::unique_ptr<TextureImage> textureImage;
         std::unique_ptr<TextureSampler> textureSampler;

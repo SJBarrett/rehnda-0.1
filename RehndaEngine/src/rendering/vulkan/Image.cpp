@@ -34,6 +34,10 @@ namespace Rehnda {
             dstAccessMask = vk::AccessFlagBits::eShaderRead;
             sourceStage = vk::PipelineStageFlagBits::eTransfer;
             destStage = vk::PipelineStageFlagBits::eFragmentShader;
+        } else if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
+            dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+            sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
+            destStage = vk::PipelineStageFlagBits::eEarlyFragmentTests; // reading of the depth buffer happens in EarlyFragmentTests, writing happens in LateFragmentTests
         } else {
             throw std::invalid_argument("Unsupported layout transition!");
         }
@@ -47,7 +51,7 @@ namespace Rehnda {
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .image = *image,
                 .subresourceRange = {
-                        .aspectMask = vk::ImageAspectFlagBits::eColor,
+                        .aspectMask = imageProps.imageAspectFlags,
                         .baseMipLevel = 0,
                         .levelCount = 1,
                         .baseArrayLayer = 0,
@@ -84,7 +88,7 @@ namespace Rehnda {
                 .viewType = vk::ImageViewType::e2D,
                 .format = imageProps.format,
                 .subresourceRange = {
-                        .aspectMask = vk::ImageAspectFlagBits::eColor,
+                        .aspectMask = imageProps.imageAspectFlags,
                         .baseMipLevel = 0,
                         .levelCount = 1,
                         .baseArrayLayer = 0,
@@ -98,7 +102,7 @@ namespace Rehnda {
         vk::MemoryRequirements imageMemoryRequirements = image.getMemoryRequirements();
 
         vk::MemoryAllocateInfo memoryAllocateInfo{
-                .allocationSize = imageProps.size,
+                .allocationSize = imageMemoryRequirements.size,
                 .memoryTypeIndex = BufferHelper::findMemoryType(physicalDevice, imageMemoryRequirements.memoryTypeBits,
                                                                 imageProps.memoryPropertyFlags)
         };
@@ -107,11 +111,25 @@ namespace Rehnda {
         return memory;
     }
 
-    vkr::ImageView &Image::getImageView() {
+    const vkr::ImageView & Image::getImageView() const {
         return imageView;
     }
 
     const vkr::Image & Image::getImage() const {
         return image;
+    }
+
+    vk::Format
+    Image::findSupportedFormat(const vkr::PhysicalDevice &physicalDevice, const std::vector<vk::Format> &candidates, vk::ImageTiling tiling,
+                               vk::FormatFeatureFlags features) {
+        for (const auto format : candidates) {
+            vk::FormatProperties properties = physicalDevice.getFormatProperties(format);
+            if (tiling == vk::ImageTiling::eLinear && (properties.linearTilingFeatures & features) == features) {
+                return format;
+            } else if (tiling == vk::ImageTiling::eOptimal && (properties.optimalTilingFeatures & features) == features) {
+                return format;
+            }
+        }
+        throw std::runtime_error("Failed to find supported format");
     }
 } // Rehnda

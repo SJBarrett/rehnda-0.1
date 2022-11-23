@@ -7,7 +7,7 @@
 
 namespace Rehnda {
     SwapchainManager::SwapchainManager(vkr::Device &device, const vkr::SurfaceKHR &surface, QueueFamilyIndices indices,
-                                       const vkr::RenderPass &renderPass, const SwapChainSupportDetails &swapChainSupportDetails) :
+                                       const vkr::RenderPass &renderPass, const vkr::ImageView& depthImageView, const SwapChainSupportDetails &swapChainSupportDetails) :
             device(device),
             surface(surface),
             queueFamilyIndices(
@@ -18,11 +18,11 @@ namespace Rehnda {
             swapchainExtent(swapChainSupportDetails.chooseSwapExtent()),
             swapchain(createSwapchain()),
             swapchainImageViews(createImageViews()),
-            swapchainFramebuffers(createFrameBuffers(renderPass)){
+            swapchainFramebuffers(createFrameBuffers(renderPass, depthImageView)){
 
     }
 
-    vkr::SwapchainKHR SwapchainManager::createSwapchain() {
+    std::unique_ptr<vkr::SwapchainKHR> SwapchainManager::createSwapchain() {
         const auto presentMode = swapChainSupportDetails.chooseSwapPresentMode();
 
         // want one more than the minimum, so we don't have to wait for the driver to complete operations
@@ -64,18 +64,22 @@ namespace Rehnda {
         createInfo.clipped = VK_TRUE; // if our window is partially hidden, we don't care about rendering those hidden values
         // TODO#3 if the window is resized the swapchainManager needs to be re-created, and the previous swap chain referenced
         createInfo.oldSwapchain = VK_NULL_HANDLE;
-       return {device, createInfo};
+       return std::make_unique<vkr::SwapchainKHR>(device, createInfo);
     }
 
-    void SwapchainManager::resize(const vkr::RenderPass &renderPass) {
+    void SwapchainManager::resize(const vkr::RenderPass &renderPass, const vkr::ImageView& depthImageView) {
         device.waitIdle();
-        createSwapchain();
-        createImageViews();
-        createFrameBuffers(renderPass);
+        swapchainFramebuffers.clear();
+        swapchainImageViews.clear();
+        swapchain.reset();
+        swapchainExtent = swapChainSupportDetails.chooseSwapExtent();
+        swapchain = createSwapchain();
+        swapchainImageViews = createImageViews();
+        swapchainFramebuffers = createFrameBuffers(renderPass, depthImageView);
     }
 
     std::vector<vkr::ImageView> SwapchainManager::createImageViews() {
-        const std::vector<VkImage> swapchainImages = swapchain.getImages();
+        const std::vector<VkImage> swapchainImages = swapchain->getImages();
         std::vector<vkr::ImageView> imageViews;
         for (size_t i = 0; i < swapchainImages.size(); i++) {
             vk::ImageViewCreateInfo imageViewCreateInfo{
@@ -105,18 +109,19 @@ namespace Rehnda {
         return swapchainExtent;
     }
 
-    std::vector<vkr::Framebuffer> SwapchainManager::createFrameBuffers(const vkr::RenderPass &renderPass) {
+    std::vector<vkr::Framebuffer> SwapchainManager::createFrameBuffers(const vkr::RenderPass &renderPass, const vkr::ImageView& depthImageView) {
         std::vector<vkr::Framebuffer> buffers;
         for (size_t i = 0; i < swapchainImageViews.size(); i++) {
-            vk::ImageView attachments[] = {
+            std::array<vk::ImageView, 2> attachments{
                     *swapchainImageViews[i],
+                    *depthImageView
             };
 
             vk::FramebufferCreateInfo framebufferCreateInfo{
                     // need the renderpass for the framebuffer to be created to be compatible with it
                     .renderPass = *renderPass,
-                    .attachmentCount = 1,
-                    .pAttachments = attachments,
+                    .attachmentCount = attachments.size(),
+                    .pAttachments = attachments.data(),
                     .width = swapchainExtent.width,
                     .height = swapchainExtent.height,
                     .layers = 1,
@@ -132,12 +137,13 @@ namespace Rehnda {
     }
 
     std::pair<vk::Result, uint32_t> SwapchainManager::acquireNextImageIndex(vkr::Semaphore &imageAvailableSemaphore) {
-        return swapchain.acquireNextImage(UINT64_MAX, *imageAvailableSemaphore);
+        return swapchain->acquireNextImage(UINT64_MAX, *imageAvailableSemaphore);
     }
 
     PresentResult SwapchainManager::present(const std::vector<vk::Semaphore> &waitSemaphores, vkr::Queue &presentQueue,
                                             uint32_t imageIndex) {
-        vk::SwapchainKHR swapChains[] = {*swapchain};
+        vkr::SwapchainKHR& swap = *swapchain;
+        vk::SwapchainKHR swapChains[] = {*swap};
         vk::PresentInfoKHR presentInfoKhr{
                 .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
                 .pWaitSemaphores = reinterpret_cast<const vk::Semaphore *>(waitSemaphores.data()),

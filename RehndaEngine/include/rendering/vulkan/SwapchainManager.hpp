@@ -42,10 +42,10 @@ namespace Rehnda {
     class SwapchainManager {
     public:
         SwapchainManager(vkr::Device &device,
-                         const vkr::SurfaceKHR &surface, QueueFamilyIndices, const vkr::RenderPass &renderPass,
+                         const vkr::SurfaceKHR &surface, QueueFamilyIndices, const vkr::RenderPass &renderPass, const vkr::ImageView& depthImageView,
                          const SwapChainSupportDetails &swapChainSupportDetails);
 
-        void resize(const vkr::RenderPass &renderPass);
+        void resize(const vkr::RenderPass &renderPass, const vkr::ImageView& depthImageView);
 
         std::pair<vk::Result, uint32_t> acquireNextImageIndex(vkr::Semaphore &imageAvailableSemaphore);
 
@@ -67,7 +67,7 @@ namespace Rehnda {
 
         vk::SurfaceFormatKHR swapchainSurfaceFormat;
         vk::Extent2D swapchainExtent;
-        vkr::SwapchainKHR swapchain;
+        std::unique_ptr<vkr::SwapchainKHR> swapchain;
         std::vector<vkr::ImageView> swapchainImageViews;
         std::vector<vkr::Framebuffer> swapchainFramebuffers;
 
@@ -75,8 +75,8 @@ namespace Rehnda {
     private:
         std::vector<vkr::ImageView> createImageViews();
 
-        vkr::SwapchainKHR createSwapchain();
+        std::unique_ptr<vkr::SwapchainKHR> createSwapchain();
 
-        std::vector<vkr::Framebuffer> createFrameBuffers(const vkr::RenderPass &renderPass);
+        std::vector<vkr::Framebuffer> createFrameBuffers(const vkr::RenderPass &renderPass, const vkr::ImageView& depthImageView);
     };
 }
